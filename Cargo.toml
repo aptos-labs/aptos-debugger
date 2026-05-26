@@ -1,0 +1,7 @@
+[workspace]
+members = [
+    "crates/move-vm-debug",
+    "crates/move-vm-debugger",
+]
+resolver = "3"
+
