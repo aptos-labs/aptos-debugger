@@ -63,7 +63,7 @@ impl StoredVariables {
             | DebugValue::Closure(_)
             | DebugValue::Delayed => proto::var(name, display),
             DebugValue::EnumVariant(_, fields) if fields.is_empty() => proto::var(name, display),
-            DebugValue::Struct(_)
+            DebugValue::Struct { .. }
             | DebugValue::EnumVariant(_, _)
             | DebugValue::Vector(_)
             | DebugValue::ContainerRef(_)
@@ -82,7 +82,7 @@ impl StoredVariables {
             return vec![];
         };
         match &container_value {
-            DebugValue::Struct(fields) | DebugValue::EnumVariant(_, fields) => fields
+            DebugValue::Struct { fields, .. } | DebugValue::EnumVariant(_, fields) => fields
                 .iter()
                 .map(|(name, child)| self.debug_value_to_variable(name.clone(), child))
                 .collect(),

@@ -217,7 +217,7 @@ impl<R: io::Read, W: io::Write> DapServer<R, W> {
                 .collect::<Vec<_>>();
             let ref_id = self
                 .stored_variables
-                .store_expandable(DebugValue::Struct(arg_fields));
+                .store_expandable(DebugValue::Struct { name: None, ty_args: vec![], fields: arg_fields });
             vars.push(Variable {
                 variables_reference: ref_id,
                 ..proto::var("args", format!("{count} args"))

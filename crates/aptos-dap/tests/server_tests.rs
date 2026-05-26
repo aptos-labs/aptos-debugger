@@ -347,7 +347,7 @@ module 0x42::test {
         [
           {
             "name": "s",
-            "value": "{ val: 42 }",
+            "value": "CopyStruct { val: 42 }",
             "variablesReference": 100000
           }
         ]"#]]);
@@ -874,6 +874,65 @@ module 0x42::test {
           {
             "name": "s",
             "value": "\"hello world\"",
+            "variablesReference": 0
+          }
+        ]"#]]);
+}
+
+#[test]
+fn test_generic_struct_display() {
+    // language=Move
+    let pkg = build_test_package(
+        r#"
+module 0x1::object {
+    struct Object<phantom T> has copy, drop, store {
+        inner: address,
+    }
+    public fun new<T>(addr: address): Object<T> { Object { inner: addr } }
+}
+
+module 0x42::test {
+    use 0x1::object;
+
+    struct MyToken has drop {}
+
+    fun consume<T: drop>(_o: object::Object<T>) {}
+
+    fun helper(o: object::Object<MyToken>): u64 {
+        consume(o); // bp1
+        42
+    }
+
+    #[test]
+    fun test_it() {
+        let o = object::new<MyToken>(@0xCAFE);
+        let _ = helper(o);
+    }
+}
+"#,
+    );
+    let mode = RunCommand::Test {
+        filter: String::new(),
+        package_path: pkg.path.clone(),
+        skip_fetch_latest_git_deps: true,
+    };
+    let mut t = DapTestServer::start(mode);
+    t.initialize_and_launch_test(&pkg);
+
+    t.assert_frame_variables(0, expect![[r#"
+        [
+          {
+            "name": "o",
+            "value": "Object<MyToken> { inner: 000000000000000000000000000000000000000000000000000000000000cafe }",
+            "variablesReference": 100000
+          }
+        ]"#]]);
+
+    t.assert_variables(100000, expect![[r#"
+        [
+          {
+            "name": "inner",
+            "value": "000000000000000000000000000000000000000000000000000000000000cafe",
             "variablesReference": 0
           }
         ]"#]]);

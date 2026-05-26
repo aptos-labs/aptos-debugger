@@ -322,7 +322,11 @@ impl DapTestServer {
     }
 
     pub fn assert_frame_variables(&mut self, frame_id: usize, expected: expect_test::Expect) {
-        let vars = self.get_frame_variables(frame_id);
+        self.assert_variables(frame_locals_ref_id(frame_id as i64), expected);
+    }
+
+    pub fn assert_variables(&mut self, variable_ref_id: i64, expected: expect_test::Expect) {
+        let vars = self.get_variables_by_reference(variable_ref_id);
         let arr: Vec<_> = vars.values().collect();
         expected.assert_eq(&serde_json::to_string_pretty(&arr).unwrap());
     }

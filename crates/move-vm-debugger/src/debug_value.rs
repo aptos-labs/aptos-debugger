@@ -21,7 +21,11 @@ pub enum DebugValue {
     Primitive(String),
     Address(String),
     Signer(String),
-    Struct(Vec<(String, DebugValue)>),
+    Struct {
+        name: Option<String>,
+        ty_args: Vec<String>,
+        fields: Vec<(String, DebugValue)>,
+    },
     EnumVariant(String, Vec<(String, DebugValue)>),
     Vector(Vec<DebugValue>),
     ContainerRef(Box<DebugValue>),
@@ -40,7 +44,14 @@ impl std::fmt::Display for DebugValue {
                 write!(f, "{}", s)
             },
             DebugValue::Signer(addr) => write!(f, "signer({addr})"),
-            DebugValue::Struct(fields) => {
+            DebugValue::Struct { name, ty_args, fields } => {
+                if let Some(n) = name {
+                    write!(f, "{}", n)?;
+                    if !ty_args.is_empty() {
+                        write!(f, "<{}>", ty_args.join(", "))?;
+                    }
+                    write!(f, " ")?;
+                }
                 write!(f, "{{ ")?;
                 for (i, (name, child)) in fields.iter().enumerate() {
                     if i > 0 {
@@ -106,6 +117,49 @@ pub enum AdtInfo {
 pub trait TypeResolver {
     fn get_adt_name(&self, ty: &Type) -> Option<(ModuleId, Identifier)>;
     fn get_adt_info(&self, ty: &Type) -> Option<AdtInfo>;
+}
+
+pub fn format_type(ty: &Type, resolver: &impl TypeResolver) -> String {
+    match ty {
+        Type::Bool => "bool".into(),
+        Type::U8 => "u8".into(),
+        Type::U16 => "u16".into(),
+        Type::U32 => "u32".into(),
+        Type::U64 => "u64".into(),
+        Type::U128 => "u128".into(),
+        Type::U256 => "u256".into(),
+        Type::I8 => "i8".into(),
+        Type::I16 => "i16".into(),
+        Type::I32 => "i32".into(),
+        Type::I64 => "i64".into(),
+        Type::I128 => "i128".into(),
+        Type::I256 => "i256".into(),
+        Type::Address => "address".into(),
+        Type::Signer => "signer".into(),
+        Type::Vector(inner) => format!("vector<{}>", format_type(inner, resolver)),
+        Type::Reference(inner) => format!("&{}", format_type(inner, resolver)),
+        Type::MutableReference(inner) => format!("&mut {}", format_type(inner, resolver)),
+        Type::Struct { .. } | Type::StructInstantiation { .. } => {
+            match resolver.get_adt_name(ty) {
+                Some((_, name)) => name.to_string(),
+                None => "?".into(),
+            }
+        },
+        _ => "?".into(),
+    }
+}
+
+fn format_adt_name(ty: &Type, resolver: &impl TypeResolver) -> Option<String> {
+    resolver.get_adt_name(ty).map(|(_, name)| name.to_string())
+}
+
+fn format_ty_args(ty: &Type, resolver: &impl TypeResolver) -> Vec<String> {
+    match ty {
+        Type::StructInstantiation { ty_args, .. } => {
+            ty_args.iter().map(|t| format_type(t, resolver)).collect()
+        },
+        _ => vec![],
+    }
 }
 
 pub fn serialize_value_for_debug(
@@ -207,14 +261,22 @@ fn serialize_adt(fields: &[Value], ty: &Type, resolver: &impl TypeResolver) -> D
         },
         Some(AdtInfo::Struct { fields: adt_fields }) => {
             let children = serialize_fields(fields, &adt_fields, resolver);
-            DebugValue::Struct(children)
+            DebugValue::Struct {
+                name: format_adt_name(ty, resolver),
+                ty_args: format_ty_args(ty, resolver),
+                fields: children,
+            }
         },
         None => {
             let children = fields
                 .iter()
                 .map(|fv| (String::new(), serialize_value(fv, None, resolver)))
                 .collect();
-            DebugValue::Struct(children)
+            DebugValue::Struct {
+                name: format_adt_name(ty, resolver),
+                ty_args: format_ty_args(ty, resolver),
+                fields: children,
+            }
         },
     }
 }
@@ -274,7 +336,7 @@ fn serialize_container_untyped(c: &Container) -> DebugValue {
                 .iter()
                 .map(|fv| (String::new(), serialize_value_untyped(fv)))
                 .collect();
-            DebugValue::Struct(children)
+            DebugValue::Struct { name: None, ty_args: vec![], fields: children }
         },
         Container::Locals(_) => DebugValue::Error("...".into()),
     }
@@ -533,6 +595,24 @@ mod tests {
     }
 
     #[test]
+    fn test_struct_with_name_and_ty_args() {
+        let ty = dummy_struct_ty(1);
+        let resolver =
+            MockTypeResolver::new(vec![(ty.clone(), vec!["val".into()])], vec![])
+                .with_struct_name(
+                    ty.clone(),
+                    ModuleId::new(AccountAddress::ONE, Identifier::new("coin").unwrap()),
+                    Identifier::new("Coin").unwrap(),
+                );
+
+        let val = Value::struct_(Struct::pack(vec![Value::u64(100)]));
+        let dv = sv(&val, &ty, &resolver);
+        assert!(matches!(&dv, DebugValue::Struct { name: Some(n), ty_args, .. }
+            if n == "Coin" && ty_args.is_empty()));
+        assert_eq!(dv.to_string(), "Coin { val: 100 }");
+    }
+
+    #[test]
     fn test_vectors() {
         let r = empty_resolver();
         assert_eq!(
@@ -759,6 +839,6 @@ mod tests {
         // invalid UTF-8 falls back to struct display
         let val = Value::struct_(Struct::pack(vec![Value::vector_u8(vec![0xFF, 0xFE])]));
         let dv = sv(&val, &string_ty, &resolver);
-        assert!(matches!(dv, DebugValue::Struct(_)));
+        assert!(matches!(dv, DebugValue::Struct { .. }));
     }
 }
