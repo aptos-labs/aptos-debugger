@@ -23,10 +23,6 @@ enum DebuggerOp {
         start_source_loc: Option<String>,
     },
     StepRemaining(usize),
-    StepOverRemaining {
-        stack_depth: usize,
-        remaining: usize,
-    },
     StepOut {
         target_stack_depth: usize,
     },
@@ -225,22 +221,6 @@ impl DebugContext for DapDebugContext {
                         self.current_op = DebuggerOp::Continue;
                         true
                     } else {
-                        false
-                    }
-                } else {
-                    false
-                }
-            },
-            DebuggerOp::StepOverRemaining {
-                stack_depth,
-                remaining,
-            } => {
-                if *stack_depth >= interpreter.get_stack_depth() {
-                    if *remaining == 1 {
-                        self.current_op = DebuggerOp::Continue;
-                        true
-                    } else {
-                        *remaining -= 1;
                         false
                     }
                 } else {
