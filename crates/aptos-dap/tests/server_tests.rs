@@ -7,6 +7,7 @@ use std::time::Duration;
 
 #[test]
 fn test_per_frame_locals() {
+    // language=Move
     let pkg = build_test_package(
         r#"
 module 0x42::test {
@@ -73,6 +74,7 @@ module 0x42::test {
 
 #[test]
 fn test_source_line_breakpoint() {
+    // language=Move
     let pkg = build_test_package(
         r#"
 module 0x42::test {
@@ -111,6 +113,7 @@ module 0x42::test {
 
 #[test]
 fn test_stack_frame_names() {
+    // language=Move
     let pkg = build_test_package(
         r#"
 module 0x42::test {
@@ -162,6 +165,7 @@ module 0x42::test {
 
 #[test]
 fn test_snapshot_no_stale() {
+    // language=Move
     let pkg = build_test_package(
         r#"
 module 0x42::test {
@@ -204,6 +208,7 @@ module 0x42::test {
 
 #[test]
 fn test_value_types() {
+    // language=Move
     let pkg = build_test_package(
         r#"
 module 0x42::test {
@@ -272,6 +277,7 @@ module 0x42::test {
 #[test]
 #[ignore] // nested struct field names not yet resolved
 fn test_nested_struct_fields() {
+    // language=Move
     let pkg = build_test_package(
         r#"
 module 0x42::test {
@@ -306,6 +312,7 @@ module 0x42::test {
 
 #[test]
 fn test_no_duplicate_copy_vars() {
+    // language=Move
     let pkg = build_test_package(
         r#"
 module 0x42::test {
@@ -348,6 +355,7 @@ module 0x42::test {
 
 #[test]
 fn test_source_bp_no_duplicate_hit() {
+    // language=Move
     let pkg = build_test_package(
         r#"
 module 0x42::test {
@@ -402,6 +410,7 @@ module 0x42::test {
 
 #[test]
 fn test_source_bp_no_duplicate_hit_with_function_call() {
+    // language=Move
     let pkg = build_test_package(
         r#"
 module 0x42::test {
@@ -458,6 +467,7 @@ module 0x42::test {
 
 #[test]
 fn test_source_bp_rehits_in_loop_statement() {
+    // language=Move
     let pkg = build_test_package(
         r#"
 module 0x42::test {
@@ -530,6 +540,7 @@ module 0x42::test {
 
 #[test]
 fn test_source_bp_rehits_in_loop_inner_function() {
+    // language=Move
     let pkg = build_test_package(
         r#"
 module 0x42::test {
@@ -633,6 +644,7 @@ module 0x42::test {
 
 #[test]
 fn test_step_over_line() {
+    // language=Move
     let pkg = build_test_package(
         r#"
 module 0x42::test {
@@ -750,6 +762,7 @@ module 0x42::test {
 
 #[test]
 fn test_signer_display() {
+    // language=Move
     let pkg = build_test_package(
         r#"
 module 0x42::test {
@@ -784,6 +797,7 @@ module 0x42::test {
 
 #[test]
 fn test_signer_display_after_move() {
+    // language=Move
     let pkg = build_test_package(
         r#"
 module 0x42::test {
@@ -821,6 +835,7 @@ module 0x42::test {
 
 #[test]
 fn test_string_variable() {
+    // language=Move
     let pkg = build_test_package(
         r#"
 module 0x1::string {
@@ -865,35 +880,8 @@ module 0x42::test {
 }
 
 #[test]
-#[ignore] // requires network access to mainnet
-fn test_replay_basic() {
-    let mode = RunCommand::Replay {
-        txn_id: 4969730041,
-        network: "mainnet".to_string(),
-        local_packages: vec![],
-        prebuilt_packages: vec![],
-        named_addresses: std::collections::BTreeMap::new(),
-        skip_fetch_latest_git_deps: true,
-    };
-    let mut t = DapTestServer::start(mode);
-    t.initialize_and_launch_replay(&[], Duration::from_secs(120));
-
-    let long_timeout = Duration::from_secs(120);
-    let mut stop_count = 0;
-    loop {
-        let frames = t.get_stack_frames();
-        assert!(!frames.is_empty(), "expected at least one stack frame");
-        stop_count += 1;
-
-        if !t.continue_execution_timeout(long_timeout) {
-            break;
-        }
-    }
-    assert!(stop_count >= 1, "should have stopped at least once");
-}
-
-#[test]
 fn test_warns_unreachable_breakpoint() {
+    // language=Move
     let pkg = build_test_package(
         r#"
 module 0x42::test {
@@ -942,4 +930,32 @@ module 0x42::test {
         warning.contains("/nonexistent/fake_module.move"),
         "warning should mention the unresolvable file, got: {warning}",
     );
+}
+
+#[test]
+#[ignore] // requires network access to mainnet
+fn test_replay_basic() {
+    let mode = RunCommand::Replay {
+        txn_id: 4969730041,
+        network: "mainnet".to_string(),
+        local_packages: vec![],
+        prebuilt_packages: vec![],
+        named_addresses: std::collections::BTreeMap::new(),
+        skip_fetch_latest_git_deps: true,
+    };
+    let mut t = DapTestServer::start(mode);
+    t.initialize_and_launch_replay(&[], Duration::from_secs(120));
+
+    let long_timeout = Duration::from_secs(120);
+    let mut stop_count = 0;
+    loop {
+        let frames = t.get_stack_frames();
+        assert!(!frames.is_empty(), "expected at least one stack frame");
+        stop_count += 1;
+
+        if !t.continue_execution_timeout(long_timeout) {
+            break;
+        }
+    }
+    assert!(stop_count >= 1, "should have stopped at least once");
 }
