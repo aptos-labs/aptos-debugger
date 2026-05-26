@@ -3,7 +3,7 @@ use crate::{
         DapCommand, DapDebugHandle, DapEvent, DapFrameInfo, DapLocalInfo, StopReason,
         VmStoppedState,
     },
-    resolver::{self, LocatorAdtResolverWithLoader},
+    resolver::{self, LocatorTypeResolver},
 };
 use crate::debug_value::DebugValue;
 use move_vm_runtime::{
@@ -156,7 +156,7 @@ impl DebugContext for DapDebugContext {
             Instruction::MoveLoc(idx) => {
                 let idx = *idx as usize;
                 if let Some(ty) = function.local_tys().get(idx) {
-                    let resolver = LocatorAdtResolverWithLoader::new(
+                    let resolver = LocatorTypeResolver::new(
                         runtime_environment,
                         interpreter,
                     );
@@ -328,7 +328,7 @@ fn build_dap_local_infos(
         return vec![];
     }
     let local_infos = resolver::build_local_infos(function);
-    let name_resolver = LocatorAdtResolverWithLoader::new(runtime_environment, interpreter);
+    let name_resolver = LocatorTypeResolver::new(runtime_environment, interpreter);
 
     local_infos
         .into_iter()

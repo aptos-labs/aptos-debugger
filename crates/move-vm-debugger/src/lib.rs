@@ -9,7 +9,7 @@ pub use dap_types::{
     create_dap_channels,
 };
 pub use debug_value::{
-    AdtInfo, DebugValue, FieldInfo, TypeResolver, print_value, serialize_value,
+    AdtInfo, DebugValue, FieldInfo, TypeResolver, serialize_value,
     serialize_value_for_debug,
 };
-pub use resolver::LocatorAdtResolverWithLoader;
+pub use resolver::LocatorTypeResolver;

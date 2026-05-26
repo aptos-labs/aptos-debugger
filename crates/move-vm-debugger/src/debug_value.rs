@@ -119,25 +119,6 @@ pub fn serialize_value_for_debug(
     serialize_value(val, Some(ty), resolver)
 }
 
-pub fn print_value(buf: &mut impl fmt::Write, val: &Value) -> PartialVMResult<()> {
-    struct ZeroNameResolver;
-    impl TypeResolver for ZeroNameResolver {
-        fn get_adt_name(&self, _ty: &Type) -> Option<(ModuleId, Identifier)> {
-            None
-        }
-
-        fn get_adt_info(&self, _ty: &Type) -> Option<AdtInfo> {
-            None
-        }
-    }
-
-    let debug_value = serialize_value(val, None, &ZeroNameResolver);
-    write!(buf, "{}", debug_value).map_err(|_| {
-        move_binary_format::errors::PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-            .with_message("failed to write to buffer".to_string())
-    })
-}
-
 pub fn serialize_value(val: &Value, ty: Option<&Type>, resolver: &impl TypeResolver) -> DebugValue {
     match (val, ty) {
         (

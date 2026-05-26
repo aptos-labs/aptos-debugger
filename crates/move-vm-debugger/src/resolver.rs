@@ -6,12 +6,12 @@ use move_vm_runtime::{
 };
 use move_vm_types::loaded_data::runtime_types::Type;
 
-pub struct LocatorAdtResolverWithLoader<'a> {
+pub struct LocatorTypeResolver<'a> {
     runtime_environment: &'a RuntimeEnvironment,
     interpreter: &'a dyn InterpreterDebugInterface,
 }
 
-impl<'a> LocatorAdtResolverWithLoader<'a> {
+impl<'a> LocatorTypeResolver<'a> {
     pub fn new(
         runtime_environment: &'a RuntimeEnvironment,
         interpreter: &'a dyn InterpreterDebugInterface,
@@ -23,7 +23,7 @@ impl<'a> LocatorAdtResolverWithLoader<'a> {
     }
 }
 
-impl TypeResolver for LocatorAdtResolverWithLoader<'_> {
+impl TypeResolver for LocatorTypeResolver<'_> {
     fn get_adt_name(&self, ty: &Type) -> Option<(ModuleId, Identifier)> {
         self.runtime_environment.get_struct_name(ty).ok().flatten()
     }
