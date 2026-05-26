@@ -1,0 +1,39 @@
+[package]
+name = "aptos-dap"
+version = "0.1.0"
+description = "Debug Adapter Protocol server for replaying Move transactions"
+license = "Apache-2.0"
+publish = false
+edition = "2024"
+
+[dependencies]
+anyhow = "1.0.98"
+aptos-framework = { workspace = true }
+aptos-gas-schedule = { workspace = true }
+aptos-move-cli = { workspace = true, features = ["testing"] }
+aptos-move-debugger = { workspace = true }
+aptos-rest-client = { workspace = true }
+aptos-types = { workspace = true }
+aptos-validator-interface = { workspace = true }
+aptos-vm-environment = { workspace = true }
+clap = { version = "4.3.9", features = ["derive"] }
+crossbeam-channel = { workspace = true }
+dap = "0.4.1-alpha1"
+hex = "0.4.3"
+legacy-move-compiler = { workspace = true }
+move-binary-format = { workspace = true }
+move-model = { workspace = true }
+move-package = { workspace = true }
+move-unit-test = { workspace = true }
+move-vm-debugger = { workspace = true }
+move-vm-runtime = { workspace = true, features = ["debugger"] }
+move-vm-types = { workspace = true }
+serde_json = "1.0.81"
+tokio = { version = "1.35.1", features = ["full"] }
+url = "2.4.0"
+
+[dev-dependencies]
+expect-test = "1.4.1"
+indexmap = "2.7.0"
+regex = "1.9.3"
+tempfile = "3.3.0"

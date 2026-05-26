@@ -1,8 +1,8 @@
 use move_core_types::{identifier::Identifier, language_storage::ModuleId};
-use move_vm_debug::{AdtInfo, FieldInfo, TypeResolver};
+use crate::debug_value::{AdtInfo, FieldInfo, TypeResolver};
 use move_vm_runtime::{
-    source_locator, LoadedFunction, RuntimeEnvironment,
     debug::InterpreterDebugInterface,
+    source_locator, LoadedFunction, RuntimeEnvironment,
 };
 use move_vm_types::loaded_data::runtime_types::Type;
 

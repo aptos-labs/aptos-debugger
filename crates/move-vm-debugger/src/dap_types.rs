@@ -1,4 +1,4 @@
-use move_vm_debug::DebugValue;
+use crate::debug_value::DebugValue;
 
 #[derive(Debug)]
 pub enum DapCommand {

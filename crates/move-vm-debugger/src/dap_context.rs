@@ -5,13 +5,16 @@ use crate::{
     },
     resolver::{self, LocatorAdtResolverWithLoader},
 };
-use move_vm_debug::DebugValue;
+use crate::debug_value::DebugValue;
 use move_vm_runtime::{
-    debug::{DebugContext, InterpreterDebugInterface},
-    source_locator, LoadedFunction, RuntimeEnvironment,
+    debug::{DebugContext, InterpreterDebugInterface, ThreadStateHandle},
+    source_locator, tracing, LoadedFunction, RuntimeEnvironment,
 };
 use move_vm_types::{instr::Instruction, values::Locals};
-use std::collections::{BTreeSet, HashMap};
+use std::{
+    collections::{BTreeSet, HashMap},
+    sync::Arc,
+};
 
 #[derive(Debug)]
 enum DebuggerOp {
@@ -157,7 +160,7 @@ impl DebugContext for DapDebugContext {
                         runtime_environment,
                         interpreter,
                     );
-                    let sv = move_vm_debug::serialize_value_for_debug(
+                    let sv = crate::debug_value::serialize_value_for_debug(
                         locals, idx, ty, &resolver,
                     );
                     self.moved_locals
@@ -290,6 +293,28 @@ impl DebugContext for DapDebugContext {
             &current_sloc,
         );
     }
+
+    fn capture_thread_state(&self) -> Box<dyn ThreadStateHandle> {
+        Box::new(DapThreadState {
+            dap_handle: self.dap_handle(),
+            source_locator: source_locator::get_source_locator(),
+        })
+    }
+}
+
+struct DapThreadState {
+    dap_handle: DapDebugHandle,
+    source_locator: Option<Arc<dyn source_locator::SourceLocator>>,
+}
+
+impl ThreadStateHandle for DapThreadState {
+    fn install_on_thread(&self) {
+        tracing::set_debugging_enabled(true);
+        tracing::set_debug_context(Box::new(DapDebugContext::new(self.dap_handle.clone())));
+        if let Some(loc) = &self.source_locator {
+            source_locator::set_source_locator(loc.clone());
+        }
+    }
 }
 
 fn build_dap_local_infos(
@@ -309,7 +334,7 @@ fn build_dap_local_infos(
         .into_iter()
         .map(|local_info| {
             let ty = &function.local_tys()[local_info.index];
-            let debug_value = move_vm_debug::serialize_value_for_debug(
+            let debug_value = crate::debug_value::serialize_value_for_debug(
                 locals,
                 local_info.index,
                 ty,

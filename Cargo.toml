@@ -1,7 +1,55 @@
 [workspace]
+resolver = "3"
 members = [
-    "crates/move-vm-debug",
+    "crates/aptos-dap",
     "crates/move-vm-debugger",
 ]
-resolver = "3"
 
+[workspace.package]
+rust-version = "1.93.1"
+
+[workspace.dependencies]
+# aptos-core deps
+aptos-framework = { path = "../aptos-core/aptos-move/framework" }
+aptos-gas-schedule = { path = "../aptos-core/aptos-move/aptos-gas-schedule" }
+aptos-move-cli = { path = "../aptos-core/aptos-move/cli" }
+aptos-move-debugger = { path = "../aptos-core/aptos-move/aptos-debugger" }
+aptos-rest-client = { path = "../aptos-core/crates/aptos-rest-client" }
+aptos-types = { path = "../aptos-core/types" }
+aptos-validator-interface = { path = "../aptos-core/aptos-move/aptos-validator-interface" }
+aptos-vm-environment = { path = "../aptos-core/aptos-move/aptos-vm-environment" }
+legacy-move-compiler = { path = "../aptos-core/third_party/move/move-compiler-v2/legacy-move-compiler" }
+move-binary-format = { path = "../aptos-core/third_party/move/move-binary-format" }
+move-core-types = { path = "../aptos-core/third_party/move/move-core/types" }
+move-model = { path = "../aptos-core/third_party/move/move-model" }
+move-package = { path = "../aptos-core/third_party/move/tools/move-package" }
+move-unit-test = { path = "../aptos-core/third_party/move/tools/move-unit-test" }
+move-vm-runtime = { path = "../aptos-core/third_party/move/move-vm/runtime" }
+move-vm-types = { path = "../aptos-core/third_party/move/move-vm/types" }
+
+# local crates
+move-vm-debugger = { path = "crates/move-vm-debugger" }
+
+# external deps
+crossbeam-channel = "0.5.4"
+
+[patch.crates-io]
+# version 0.6 at commit 444eb13579c733089453806743b19f1ea2dce1c0 did not expose 'run_bench_with_bencher' as a public function, which we need
+dudect-bencher = { git = "https://github.com/aptos-labs/dudect-bencher", rev = "9515677c83c58884c1a8c764251753269d46fc0e" }
+serde-reflection = { git = "https://github.com/aptos-labs/serde-reflection", rev = "9d2374af843a4562a194529b3cadb8518d7fcd65" }
+merlin = { git = "https://github.com/aptos-labs/merlin" }
+futures = { git = "https://github.com/aptos-labs/futures-rs", branch = "backport" }
+futures-channel = { git = "https://github.com/aptos-labs/futures-rs", branch = "backport" }
+futures-executor = { git = "https://github.com/aptos-labs/futures-rs", branch = "backport" }
+futures-core = { git = "https://github.com/aptos-labs/futures-rs", branch = "backport" }
+futures-util = { git = "https://github.com/aptos-labs/futures-rs", branch = "backport" }
+futures-sink = { git = "https://github.com/aptos-labs/futures-rs", branch = "backport" }
+futures-io = { git = "https://github.com/aptos-labs/futures-rs", branch = "backport" }
+futures-task = { git = "https://github.com/aptos-labs/futures-rs", branch = "backport" }
+futures-macro = { git = "https://github.com/aptos-labs/futures-rs", branch = "backport" }
+ark-ec = { git = "https://github.com/aptos-labs/algebra", branch = "fix-fft-parallelism-cutoff" }
+ark-ff = { git = "https://github.com/aptos-labs/algebra", branch = "fix-fft-parallelism-cutoff" }
+ark-ff-macros = { git = "https://github.com/aptos-labs/algebra", branch = "fix-fft-parallelism-cutoff" }
+ark-ff-asm = { git = "https://github.com/aptos-labs/algebra", branch = "fix-fft-parallelism-cutoff" }
+ark-poly = { git = "https://github.com/aptos-labs/algebra", branch = "fix-fft-parallelism-cutoff" }
+ark-serialize = { git = "https://github.com/aptos-labs/algebra", branch = "fix-fft-parallelism-cutoff" }

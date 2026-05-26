@@ -7,9 +7,12 @@ publish = false
 edition = "2024"
 
 [dependencies]
-crossbeam-channel = "0.5.4"
-move-binary-format = { path = "../../../aptos-core/third_party/move/move-binary-format" }
-move-core-types = { path = "../../../aptos-core/third_party/move/move-core/types" }
-move-vm-debug = { path = "../move-vm-debug" }
-move-vm-runtime = { path = "../../../aptos-core/third_party/move/move-vm/runtime" }
-move-vm-types = { path = "../../../aptos-core/third_party/move/move-vm/types" }
+crossbeam-channel = { workspace = true }
+move-binary-format = { workspace = true }
+move-core-types = { workspace = true }
+move-vm-runtime = { workspace = true, features = ["debugger"] }
+move-vm-types = { workspace = true }
+
+[dev-dependencies]
+move-vm-types = { workspace = true, features = ["testing"] }
+triomphe = "0.1.14"
