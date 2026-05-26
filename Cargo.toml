@@ -25,7 +25,7 @@ move-model = { path = "../aptos-core/third_party/move/move-model" }
 move-package = { path = "../aptos-core/third_party/move/tools/move-package" }
 move-unit-test = { path = "../aptos-core/third_party/move/tools/move-unit-test" }
 move-vm-runtime = { path = "../aptos-core/third_party/move/move-vm/runtime" }
-move-vm-types = { path = "../aptos-core/third_party/move/move-vm/types" }
+move-vm-types = { path = "../aptos-core/third_party/move/move-vm/types", features = ["debugger"] }
 
 # local crates
 move-vm-debugger = { path = "crates/move-vm-debugger" }
@@ -38,15 +38,6 @@ crossbeam-channel = "0.5.4"
 dudect-bencher = { git = "https://github.com/aptos-labs/dudect-bencher", rev = "9515677c83c58884c1a8c764251753269d46fc0e" }
 serde-reflection = { git = "https://github.com/aptos-labs/serde-reflection", rev = "9d2374af843a4562a194529b3cadb8518d7fcd65" }
 merlin = { git = "https://github.com/aptos-labs/merlin" }
-futures = { git = "https://github.com/aptos-labs/futures-rs", branch = "backport" }
-futures-channel = { git = "https://github.com/aptos-labs/futures-rs", branch = "backport" }
-futures-executor = { git = "https://github.com/aptos-labs/futures-rs", branch = "backport" }
-futures-core = { git = "https://github.com/aptos-labs/futures-rs", branch = "backport" }
-futures-util = { git = "https://github.com/aptos-labs/futures-rs", branch = "backport" }
-futures-sink = { git = "https://github.com/aptos-labs/futures-rs", branch = "backport" }
-futures-io = { git = "https://github.com/aptos-labs/futures-rs", branch = "backport" }
-futures-task = { git = "https://github.com/aptos-labs/futures-rs", branch = "backport" }
-futures-macro = { git = "https://github.com/aptos-labs/futures-rs", branch = "backport" }
 ark-ec = { git = "https://github.com/aptos-labs/algebra", branch = "fix-fft-parallelism-cutoff" }
 ark-ff = { git = "https://github.com/aptos-labs/algebra", branch = "fix-fft-parallelism-cutoff" }
 ark-ff-macros = { git = "https://github.com/aptos-labs/algebra", branch = "fix-fft-parallelism-cutoff" }
