@@ -310,10 +310,10 @@ struct DapThreadState {
 impl ThreadStateHandle for DapThreadState {
     fn install_on_thread(&self) {
         tracing::set_debugging_enabled(true);
-        tracing::set_debug_context(Box::new(DapDebugContext::new(self.dap_handle.clone())));
         if let Some(loc) = &self.source_locator {
             source_locator::set_source_locator(loc.clone());
         }
+        tracing::set_debug_context(Box::new(DapDebugContext::new(self.dap_handle.clone())));
     }
 }
 

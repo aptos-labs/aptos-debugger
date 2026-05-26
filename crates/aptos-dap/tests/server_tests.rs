@@ -1006,6 +1006,103 @@ fn test_replay_basic() {
     t.initialize_and_launch_replay(&[], Duration::from_secs(120));
 
     let long_timeout = Duration::from_secs(120);
+    t.assert_variables_timeout(1, long_timeout, expect![[r#"
+        [
+          {
+            "name": "version",
+            "value": "4969730041",
+            "variablesReference": 0
+          },
+          {
+            "name": "sender",
+            "value": "0x87e531c780923fdc8cb79891a10e0159947843909fa2322c330cc22940d08f",
+            "variablesReference": 0
+          },
+          {
+            "name": "hash",
+            "value": "61365272",
+            "variablesReference": 0
+          },
+          {
+            "name": "function",
+            "value": "50ead22afd6ffd9769e3b3d6e0e64a2a350d68e8b102c4e72e33d0b8cfdfdb06::dex_accounts_entry::place_bulk_orders_to_subaccount",
+            "variablesReference": 0
+          },
+          {
+            "name": "gas_used",
+            "value": "752",
+            "variablesReference": 0
+          },
+          {
+            "name": "gas_unit_price",
+            "value": "100",
+            "variablesReference": 0
+          },
+          {
+            "name": "max_gas_amount",
+            "value": "2000000",
+            "variablesReference": 0
+          },
+          {
+            "name": "status",
+            "value": "Success",
+            "variablesReference": 0
+          },
+          {
+            "name": "args",
+            "value": "9 args",
+            "variablesReference": 100000
+          }
+        ]"#]]);
+    t.assert_variables_timeout(100000, long_timeout, expect![[r#"
+        [
+          {
+            "name": "arg[0]",
+            "value": "Object<0x50ead22afd6ffd9769e3b3d6e0e64a2a350d68e8b102c4e72e33d0b8cfdfdb06::dex_accounts::Subaccount> { inner: 0x3c1f10c17001c98f6fced3fdace3c3906b84eae427e9c7f5cd8397159c2cfec2 }",
+            "variablesReference": 100001
+          },
+          {
+            "name": "arg[1]",
+            "value": "Object<0x50ead22afd6ffd9769e3b3d6e0e64a2a350d68e8b102c4e72e33d0b8cfdfdb06::perp_market::PerpMarket> { inner: 0x5cfcf06f3c133d71a0cc967736a03848be99919f7eca30fba94f4015a3a7267a }",
+            "variablesReference": 100002
+          },
+          {
+            "name": "arg[2]",
+            "value": "345059",
+            "variablesReference": 0
+          },
+          {
+            "name": "arg[3]",
+            "value": "[94880000, 94810000]",
+            "variablesReference": 100003
+          },
+          {
+            "name": "arg[4]",
+            "value": "[28290000, 58450000]",
+            "variablesReference": 100004
+          },
+          {
+            "name": "arg[5]",
+            "value": "[95050000, 95120000]",
+            "variablesReference": 100005
+          },
+          {
+            "name": "arg[6]",
+            "value": "[32130000, 66400000]",
+            "variablesReference": 100006
+          },
+          {
+            "name": "arg[7]",
+            "value": "Option<address> {  }",
+            "variablesReference": 100007
+          },
+          {
+            "name": "arg[8]",
+            "value": "Option<u64> {  }",
+            "variablesReference": 100008
+          }
+        ]"#]]);
+
     let mut stop_count = 0;
     loop {
         let frames = t.get_stack_frames();

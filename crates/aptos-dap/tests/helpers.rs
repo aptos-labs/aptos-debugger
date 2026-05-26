@@ -331,6 +331,17 @@ impl DapTestServer {
         expected.assert_eq(&serde_json::to_string_pretty(&arr).unwrap());
     }
 
+    pub fn assert_variables_timeout(
+        &mut self,
+        variable_ref_id: i64,
+        timeout: Duration,
+        expected: expect_test::Expect,
+    ) {
+        let vars = self.get_variables_by_reference_timeout(variable_ref_id, timeout);
+        let arr: Vec<_> = vars.values().collect();
+        expected.assert_eq(&serde_json::to_string_pretty(&arr).unwrap());
+    }
+
     pub fn get_frame_variables(&mut self, frame_id: usize) -> IndexMap<String, serde_json::Value> {
         self.get_variables_by_reference(frame_locals_ref_id(frame_id as i64))
     }
@@ -339,11 +350,19 @@ impl DapTestServer {
         &mut self,
         variable_ref_id: i64,
     ) -> IndexMap<String, serde_json::Value> {
+        self.get_variables_by_reference_timeout(variable_ref_id, RECV_TIMEOUT)
+    }
+
+    pub fn get_variables_by_reference_timeout(
+        &mut self,
+        variable_ref_id: i64,
+        timeout: Duration,
+    ) -> IndexMap<String, serde_json::Value> {
         self.send(
             "variables",
             Some(serde_json::json!({ "variablesReference": variable_ref_id })),
         );
-        let resp = self.collect_until_response("variables", 5);
+        let resp = self.collect_until_response_timeout("variables", 5, timeout);
         resp["body"]["variables"]
             .as_array()
             .expect("no variables array")

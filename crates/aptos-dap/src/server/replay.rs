@@ -3,14 +3,28 @@ use anyhow::bail;
 use aptos_move_cli::source_locator::AptosSourceLocator;
 use aptos_move_debugger::aptos_debugger::AptosDebugger;
 use aptos_rest_client::{AptosBaseUrl, Client};
-use aptos_types::transaction::{
-    PersistedAuxiliaryInfo, SignedTransaction, Transaction, TransactionInfo, TransactionPayload,
+use aptos_types::{
+    state_store::{StateView, state_key::StateKey},
+    transaction::{
+        PersistedAuxiliaryInfo, SignedTransaction, Transaction, TransactionInfo, TransactionPayload,
+    },
 };
 use aptos_validator_interface::LocalModuleOverrides;
 use dap::types::Variable;
-use move_vm_debugger::{DebugValue, DapDebugContext, DapEvent, create_dap_channels};
+use move_binary_format::CompiledModule;
+use move_bytecode_utils::compiled_module_viewer::CompiledModuleView;
+use move_core_types::language_storage::ModuleId;
+use move_resource_viewer::MoveValueAnnotator;
+use move_vm_debugger::{DapDebugContext, DapEvent, DebugValue, create_dap_channels};
 use move_vm_runtime::{source_locator, tracing};
-use std::{collections::BTreeMap, io, path::PathBuf, sync::Arc, thread};
+use std::{
+    cell::RefCell,
+    collections::{BTreeMap, HashMap},
+    io,
+    path::PathBuf,
+    sync::Arc,
+    thread,
+};
 use url::Url;
 
 pub(crate) const SCOPE_TRANSACTION_INFO: i64 = 1;
@@ -21,6 +35,7 @@ pub struct ReplayTransactionSession {
     pub txn: SignedTransaction,
     pub txn_info: TransactionInfo,
     pub aux_info: PersistedAuxiliaryInfo,
+    decoded_args: Vec<(String, DebugValue)>,
 }
 
 impl ReplayTransactionSession {
@@ -43,12 +58,15 @@ impl ReplayTransactionSession {
             _ => bail!("only user transactions are supported for debugging"),
         };
 
+        let debugger = Arc::new(debugger);
+        let decoded_args = decode_entry_function_args(&debugger, txn_id, &txn);
         Ok(Self {
-            debugger: Arc::new(debugger),
+            debugger,
             txn_id,
             txn,
             txn_info,
             aux_info,
+            decoded_args,
         })
     }
 }
@@ -174,11 +192,7 @@ impl<R: io::Read, W: io::Write> DapServer<R, W> {
             eprintln!("aptos-dap: starting transaction execution...");
 
             let result = aptos_move_cli::local_simulation::run_transaction_with_local_overrides(
-                &*debugger,
-                txn_id,
-                txn,
-                aux_info,
-                overrides,
+                &*debugger, txn_id, txn, aux_info, overrides,
                 // source_locator is already installed on thread, pass None here
                 None,
             );
@@ -187,12 +201,12 @@ impl<R: io::Read, W: io::Write> DapServer<R, W> {
                 Ok((status, _output)) => {
                     eprintln!("aptos-dap: execution finished with status: {:?}", status);
                     None
-                },
+                }
                 Err(e) => {
                     let msg = format!("{e:#}");
                     eprintln!("aptos-dap: execution error: {msg}");
                     Some(msg)
-                },
+                }
             };
             let _ = event_tx.send(DapEvent::Terminated { message });
             Ok(())
@@ -208,16 +222,15 @@ impl<R: io::Read, W: io::Write> DapServer<R, W> {
         let Some(txn_session) = &self.txn_session else {
             return vec![];
         };
-        let (mut vars, args) = transaction_info_variables_static(txn_session);
-        if !args.is_empty() {
-            let count = args.len();
-            let arg_fields = args
-                .into_iter()
-                .map(|(name, val)| (name, DebugValue::Primitive(val)))
-                .collect::<Vec<_>>();
-            let ref_id = self
-                .stored_variables
-                .store_expandable(DebugValue::Struct { name: None, ty_args: vec![], fields: arg_fields });
+        let mut vars = transaction_info_variables_static(txn_session);
+        if !txn_session.decoded_args.is_empty() {
+            let count = txn_session.decoded_args.len();
+            let arg_fields = txn_session.decoded_args.clone();
+            let ref_id = self.stored_variables.store_expandable(DebugValue::Struct {
+                name: None,
+                ty_args: vec![],
+                fields: arg_fields,
+            });
             vars.push(Variable {
                 variables_reference: ref_id,
                 ..proto::var("args", format!("{count} args"))
@@ -272,18 +285,10 @@ fn load_prebuilt_package(
     Ok(())
 }
 
-fn transaction_info_variables_static(
-    txn_session: &ReplayTransactionSession,
-) -> (Vec<Variable>, Vec<(String, String)>) {
-    use aptos_types::transaction::TransactionExecutableRef;
-
+fn transaction_info_variables_static(txn_session: &ReplayTransactionSession) -> Vec<Variable> {
     let txn = &txn_session.txn;
     let info = &txn_session.txn_info;
-    let ef = txn.payload().executable_ref().ok().and_then(|e| match e {
-        TransactionExecutableRef::EntryFunction(ef) => Some(ef),
-        _ => None,
-    });
-    let vars = vec![
+    vec![
         proto::var("version", txn_session.txn_id.to_string()),
         proto::var("sender", txn.sender().to_hex_literal()),
         proto::var("hash", format!("{}", txn.committed_hash())),
@@ -292,17 +297,137 @@ fn transaction_info_variables_static(
         proto::var("gas_unit_price", txn.gas_unit_price().to_string()),
         proto::var("max_gas_amount", txn.max_gas_amount().to_string()),
         proto::var("status", format!("{:?}", info.status())),
-    ];
-    let mut args = vec![];
-    if let Some(ef) = ef {
-        if !ef.ty_args().is_empty() {
-            args.push(("type_args".to_string(), format!("{:?}", ef.ty_args())));
+    ]
+}
+
+struct StateViewModuleViewer<S> {
+    state_view: S,
+    cache: RefCell<HashMap<ModuleId, Arc<CompiledModule>>>,
+}
+
+impl<S: StateView> CompiledModuleView for StateViewModuleViewer<S> {
+    type Item = Arc<CompiledModule>;
+
+    fn view_compiled_module(&self, module_id: &ModuleId) -> anyhow::Result<Option<Self::Item>> {
+        if let Some(cached) = self.cache.borrow().get(module_id) {
+            return Ok(Some(cached.clone()));
         }
-        for (i, arg) in ef.args().iter().enumerate() {
-            args.push((format!("arg[{i}]"), hex::encode(arg)));
+        let state_key = StateKey::module_id(module_id);
+        match self.state_view.get_state_value_bytes(&state_key)? {
+            Some(bytes) => {
+                let module = CompiledModule::deserialize(&bytes)
+                    .map_err(|e| anyhow::anyhow!("deserialize {}: {:?}", module_id, e))?;
+                let module = Arc::new(module);
+                self.cache
+                    .borrow_mut()
+                    .insert(module_id.clone(), module.clone());
+                Ok(Some(module))
+            }
+            None => Ok(None),
         }
     }
-    (vars, args)
+}
+
+fn annotated_to_debug_value(v: &move_resource_viewer::AnnotatedMoveValue) -> DebugValue {
+    use move_resource_viewer::AnnotatedMoveValue;
+    match v {
+        AnnotatedMoveValue::Bool(b) => DebugValue::Primitive(b.to_string()),
+        AnnotatedMoveValue::U8(n) => DebugValue::Primitive(n.to_string()),
+        AnnotatedMoveValue::U16(n) => DebugValue::Primitive(n.to_string()),
+        AnnotatedMoveValue::U32(n) => DebugValue::Primitive(n.to_string()),
+        AnnotatedMoveValue::U64(n) => DebugValue::Primitive(n.to_string()),
+        AnnotatedMoveValue::U128(n) => DebugValue::Primitive(n.to_string()),
+        AnnotatedMoveValue::U256(n) => DebugValue::Primitive(n.to_string()),
+        AnnotatedMoveValue::I8(n) => DebugValue::Primitive(n.to_string()),
+        AnnotatedMoveValue::I16(n) => DebugValue::Primitive(n.to_string()),
+        AnnotatedMoveValue::I32(n) => DebugValue::Primitive(n.to_string()),
+        AnnotatedMoveValue::I64(n) => DebugValue::Primitive(n.to_string()),
+        AnnotatedMoveValue::I128(n) => DebugValue::Primitive(n.to_string()),
+        AnnotatedMoveValue::I256(n) => DebugValue::Primitive(n.to_string()),
+        AnnotatedMoveValue::Address(a) => DebugValue::Address(a.to_hex_literal()),
+        AnnotatedMoveValue::Bytes(b) => DebugValue::Primitive(hex::encode(b)),
+        AnnotatedMoveValue::Vector(_, items) => {
+            DebugValue::Vector(items.iter().map(annotated_to_debug_value).collect())
+        }
+        AnnotatedMoveValue::Struct(s) => {
+            let name = Some(s.ty_tag.name.to_string());
+            let ty_args = s
+                .ty_tag
+                .type_args
+                .iter()
+                .map(|t| t.to_canonical_string())
+                .collect();
+            let fields = s
+                .value
+                .iter()
+                .map(|(name, val)| (name.to_string(), annotated_to_debug_value(val)))
+                .collect();
+            DebugValue::Struct {
+                name,
+                ty_args,
+                fields,
+            }
+        }
+        AnnotatedMoveValue::RawStruct(s) => {
+            let fields = s
+                .field_values
+                .iter()
+                .enumerate()
+                .map(|(i, val)| (format!("[{i}]"), annotated_to_debug_value(val)))
+                .collect();
+            DebugValue::Struct {
+                name: None,
+                ty_args: vec![],
+                fields,
+            }
+        }
+        AnnotatedMoveValue::Closure(c) => {
+            DebugValue::Closure(format!("{}::{}", c.module_id, c.fun_id))
+        }
+    }
+}
+
+fn decode_entry_function_args(
+    debugger: &Arc<AptosDebugger>,
+    txn_id: u64,
+    txn: &SignedTransaction,
+) -> Vec<(String, DebugValue)> {
+    use aptos_types::transaction::TransactionExecutableRef;
+
+    let Some(entry_fn) = txn.payload().executable_ref().ok().and_then(|e| match e {
+        TransactionExecutableRef::EntryFunction(ef) => Some(ef),
+        _ => None,
+    }) else {
+        return vec![];
+    };
+
+    let mut args = vec![];
+    if !entry_fn.ty_args().is_empty() {
+        args.push((
+            "type_args".to_string(),
+            DebugValue::Primitive(format!("{:?}", entry_fn.ty_args())),
+        ));
+    }
+
+    let state_view = debugger.state_view_at_version(txn_id);
+    let module_viewer = StateViewModuleViewer {
+        state_view,
+        cache: RefCell::new(HashMap::new()),
+    };
+    let annotator = MoveValueAnnotator::new(module_viewer);
+    let decoded =
+        annotator.view_function_arguments(entry_fn.module(), entry_fn.function(), entry_fn.ty_args(), entry_fn.args());
+
+    for (i, arg) in entry_fn.args().iter().enumerate() {
+        let value = decoded
+            .as_ref()
+            .ok()
+            .and_then(|vals| vals.get(i))
+            .map(annotated_to_debug_value)
+            .unwrap_or_else(|| DebugValue::Primitive(hex::encode(arg)));
+        args.push((format!("arg[{i}]"), value));
+    }
+    args
 }
 
 pub(crate) fn entry_function_name(payload: &TransactionPayload) -> String {
@@ -310,7 +435,7 @@ pub(crate) fn entry_function_name(payload: &TransactionPayload) -> String {
     match payload.executable_ref().ok() {
         Some(TransactionExecutableRef::EntryFunction(ef)) => {
             format!("{}::{}", ef.module(), ef.function())
-        },
+        }
         _ => format!("{:?}", payload),
     }
 }

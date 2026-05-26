@@ -21,8 +21,10 @@ aptos-vm-environment = { path = "../aptos-core/aptos-move/aptos-vm-environment" 
 legacy-move-compiler = { path = "../aptos-core/third_party/move/move-compiler-v2/legacy-move-compiler" }
 move-binary-format = { path = "../aptos-core/third_party/move/move-binary-format" }
 move-core-types = { path = "../aptos-core/third_party/move/move-core/types" }
+move-bytecode-utils = { path = "../aptos-core/third_party/move/tools/move-bytecode-utils" }
 move-model = { path = "../aptos-core/third_party/move/move-model" }
 move-package = { path = "../aptos-core/third_party/move/tools/move-package" }
+move-resource-viewer = { path = "../aptos-core/third_party/move/tools/move-resource-viewer" }
 move-unit-test = { path = "../aptos-core/third_party/move/tools/move-unit-test" }
 move-vm-runtime = { path = "../aptos-core/third_party/move/move-vm/runtime" }
 move-vm-types = { path = "../aptos-core/third_party/move/move-vm/types", features = ["debugger"] }
