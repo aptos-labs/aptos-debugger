@@ -1,3 +1,4 @@
+use crate::debugger::{DapCommand, DapEvent, StopReason, VmStoppedState};
 use crate::{
     proto,
     server::{
@@ -8,7 +9,6 @@ use crate::{
 };
 use anyhow::Result;
 use dap::{
-    events::OutputEventBody,
     requests::{Command, Request},
     responses::ResponseBody,
     types::{
@@ -16,7 +16,6 @@ use dap::{
         StoppedEventReason, Thread,
     },
 };
-use crate::debugger::{DapCommand, DapEvent, StopReason, VmStoppedState};
 use std::{
     collections::BTreeMap,
     fmt::Display,
@@ -346,13 +345,13 @@ impl<R: io::Read, W: io::Write> DapServer<R, W> {
             .collect();
         for bp in unreachable {
             if is_replay {
-                self.send_warning(format_args!(
+                self.send_stderr(format_args!(
                     "⚠ Breakpoint at {bp} is unreachable: \
                      no local source package contains this file. \
                      Add the package via useLocalPackages in launch.json",
                 ))?;
             } else {
-                self.send_warning(format_args!(
+                self.send_stderr(format_args!(
                     "⚠ Breakpoint at {bp} is unreachable: \
                      source file not found in the compiled package.",
                 ))?;
@@ -546,20 +545,14 @@ impl<R: io::Read, W: io::Write> DapServer<R, W> {
     }
 
     fn send_console(&mut self, msg: impl Display) -> Result<()> {
-        self.send_output(OutputEventCategory::Console, msg)
-    }
-
-    fn send_warning(&mut self, msg: impl Display) -> Result<()> {
-        self.send_output(OutputEventCategory::Stderr, msg)
-    }
-
-    fn send_output(&mut self, category: OutputEventCategory, msg: impl Display) -> Result<()> {
         self.server
-            .send_event(dap::events::Event::Output(OutputEventBody {
-                category: Some(category),
-                output: format!("{msg}\n"),
-                ..Default::default()
-            }))?;
+            .send_event(proto::output_event(OutputEventCategory::Console, msg))?;
+        Ok(())
+    }
+
+    fn send_stderr(&mut self, msg: impl Display) -> Result<()> {
+        self.server
+            .send_event(proto::output_event(OutputEventCategory::Stderr, msg))?;
         Ok(())
     }
 
@@ -587,12 +580,7 @@ impl<R: io::Read, W: io::Write> DapServer<R, W> {
 
     fn send_output_and_terminate(&mut self, message: Option<String>) -> Result<()> {
         if let Some(msg) = message {
-            self.server
-                .send_event(dap::events::Event::Output(OutputEventBody {
-                    category: Some(OutputEventCategory::Stderr),
-                    output: format!("{msg}\n"),
-                    ..Default::default()
-                }))?;
+            self.send_stderr(msg)?;
         }
         self.server
             .send_event(dap::events::Event::Terminated(None))?;

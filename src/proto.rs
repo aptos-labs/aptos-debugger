@@ -1,6 +1,6 @@
 use dap::{
-    events::{Event, StoppedEventBody},
-    types::{StoppedEventReason, Variable},
+    events::{Event, OutputEventBody, StoppedEventBody},
+    types::{OutputEventCategory, StoppedEventReason, Variable},
 };
 use crate::debugger::StopReason;
 
@@ -21,6 +21,14 @@ pub(crate) fn stopped_event(reason: StoppedEventReason) -> Event {
         text: None,
         all_threads_stopped: Some(true),
         hit_breakpoint_ids: None,
+    })
+}
+
+pub(crate) fn output_event(category: OutputEventCategory, msg: impl std::fmt::Display) -> Event {
+    Event::Output(OutputEventBody {
+        category: Some(category),
+        output: format!("{msg}\n"),
+        ..Default::default()
     })
 }
 
