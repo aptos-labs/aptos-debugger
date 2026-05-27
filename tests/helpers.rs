@@ -1,4 +1,4 @@
-use aptos_dap::server::{DapServer, RunCommand, variables::frame_locals_ref_id};
+use aptos_dap::server::{variables::frame_locals_ref_id, DapServer, RunCommand};
 use indexmap::IndexMap;
 use std::{
     collections::BTreeMap,
@@ -55,12 +55,6 @@ pub fn test_mode(pkg: &TestPackage) -> RunCommand {
 }
 
 impl TestPackage {
-    pub fn bp(&self, name: &str) -> &str {
-        self.breakpoints
-            .get(name)
-            .unwrap_or_else(|| panic!("no breakpoint named '{name}'"))
-    }
-
     pub fn all_bps(&self) -> Vec<&str> {
         self.breakpoints.values().map(|s| s.as_str()).collect()
     }
@@ -347,10 +341,6 @@ impl DapTestServer {
         let vars = self.get_variables_by_reference_timeout(variable_ref_id, timeout);
         let arr: Vec<_> = vars.values().collect();
         expected.assert_eq(&serde_json::to_string_pretty(&arr).unwrap());
-    }
-
-    pub fn get_frame_variables(&mut self, frame_id: usize) -> IndexMap<String, serde_json::Value> {
-        self.get_variables_by_reference(frame_locals_ref_id(frame_id as i64))
     }
 
     pub fn get_variables_by_reference(

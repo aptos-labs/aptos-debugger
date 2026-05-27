@@ -4,12 +4,13 @@ use crate::debugger::{
         DapCommand, DapDebugHandle, DapEvent, DapFrameInfo, DapLocalInfo, StopReason,
         VmStoppedState,
     },
+    debug_value,
     resolver::{self, LocatorTypeResolver},
 };
 use move_vm_runtime::{
+    debug::{DebugContext, InterpreterDebugInterface, ThreadStateHandle}, source_locator,
+    tracing,
     LoadedFunction, RuntimeEnvironment,
-    debug::{DebugContext, InterpreterDebugInterface, ThreadStateHandle},
-    source_locator, tracing,
 };
 use move_vm_types::{instr::Instruction, values::Locals};
 use std::{
@@ -63,11 +64,10 @@ impl DapDebugContext {
         function: &LoadedFunction,
         locals: &Locals,
         pc: u16,
-        _instr: &Instruction,
         runtime_environment: &RuntimeEnvironment,
         interpreter: &dyn InterpreterDebugInterface,
         instr_string: &str,
-        function_string: &str,
+        fq_function_name: &str,
         stop_reason: StopReason,
         source_loc: &Option<String>,
     ) {
@@ -76,7 +76,7 @@ impl DapDebugContext {
             locals,
             pc,
             instr_string,
-            function_string,
+            fq_function_name,
             runtime_environment,
             interpreter,
             &self.moved_locals,
@@ -138,6 +138,7 @@ impl DapDebugContext {
 }
 
 impl DebugContext for DapDebugContext {
+    /// Executed before each bytecode instruction by the VM.
     fn debug_loop(
         &mut self,
         function: &LoadedFunction,
@@ -150,26 +151,33 @@ impl DebugContext for DapDebugContext {
         let current_stack_depth = interpreter.get_stack_depth();
 
         match instr {
-            Instruction::MoveLoc(idx) => {
-                let idx = *idx as usize;
-                if let Some(ty) = function.local_tys().get(idx) {
-                    let resolver = LocatorTypeResolver::new(runtime_environment, interpreter);
-                    let sv =
-                        crate::debugger::debug_value::serialize_value_for_debug(locals, idx, ty, &resolver);
+            // After each variable is "moved" throughout the execution, it disappears from Locals.
+            // We still want to be able to inspect it from the Variables, so we save all of those in `self.moved_locals`.
+            Instruction::MoveLoc(local_idx) => {
+                let local_idx = *local_idx as usize;
+                if let Some(local_ty) = function.local_tys().get(local_idx) {
+                    let type_resolver = LocatorTypeResolver::new(runtime_environment, interpreter);
+                    let dv = debug_value::serialize_local_value(
+                        locals,
+                        local_idx,
+                        local_ty,
+                        &type_resolver,
+                    );
+                    // we save locals only on specific `current_stack_depth`, and clear those on `Ret` later
                     self.moved_locals
                         .entry(current_stack_depth)
                         .or_default()
-                        .insert(idx, sv);
+                        .insert(local_idx, dv);
                 }
             }
             Instruction::Ret => {
                 self.moved_locals.remove(&current_stack_depth);
             }
-            _ => {}
+            _ => (),
         }
 
         let instr_string = format!("{:?}", instr);
-        let function_string = function.name_as_pretty_string();
+        let fq_function_name = function.name_as_pretty_string();
         let current_sloc = function.module_id().and_then(|mid| {
             source_locator::get_bytecode_source_location(mid, function.index(), pc)
         });
@@ -246,7 +254,7 @@ impl DebugContext for DapDebugContext {
                         || current_sloc.as_deref() == Some(bp.as_str())
                 })
                 .cloned()
-                .unwrap_or(function_string.clone());
+                .unwrap_or(fq_function_name.clone());
             StopReason::Breakpoint(bp_match)
         } else {
             StopReason::Step
@@ -256,11 +264,10 @@ impl DebugContext for DapDebugContext {
             function,
             locals,
             pc,
-            instr,
             runtime_environment,
             interpreter,
             &instr_string,
-            &function_string,
+            &fq_function_name,
             stop_reason,
             &current_sloc,
         );
@@ -306,12 +313,8 @@ fn build_dap_local_infos(
         .into_iter()
         .map(|local_info| {
             let ty = &function.local_tys()[local_info.index];
-            let debug_value = crate::debugger::debug_value::serialize_value_for_debug(
-                locals,
-                local_info.index,
-                ty,
-                &name_resolver,
-            );
+            let debug_value =
+                debug_value::serialize_local_value(locals, local_info.index, ty, &name_resolver);
             let debug_value = if matches!(&debug_value, DebugValue::Invalid) {
                 moved_locals
                     .and_then(|m| m.get(&local_info.index))
@@ -335,7 +338,7 @@ fn build_vm_stopped_state(
     locals: &Locals,
     pc: u16,
     instr_string: &str,
-    function_string: &str,
+    function_name: &str,
     runtime_environment: &RuntimeEnvironment,
     interpreter: &dyn InterpreterDebugInterface,
     moved_locals: &HashMap<usize, HashMap<usize, DebugValue>>,
@@ -394,7 +397,7 @@ fn build_vm_stopped_state(
     );
 
     VmStoppedState {
-        function_name: function_string.to_string(),
+        function_name: function_name.to_string(),
         pc,
         instruction: instr_string.to_string(),
         dap_stack_trace,

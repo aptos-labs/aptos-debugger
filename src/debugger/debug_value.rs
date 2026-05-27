@@ -162,18 +162,18 @@ fn format_ty_args(ty: &Type, resolver: &impl TypeResolver) -> Vec<String> {
     }
 }
 
-pub fn serialize_value_for_debug(
+pub fn serialize_local_value(
     locals: &Locals,
     idx: usize,
     ty: &Type,
     resolver: &impl TypeResolver,
 ) -> DebugValue {
     let locals_ref = locals.borrow_values();
-    let val = &locals_ref[idx];
+    let val = &locals_ref.get(idx).unwrap_or(&Value::Invalid);
     serialize_value(val, Some(ty), resolver)
 }
 
-pub fn serialize_value(val: &Value, ty: Option<&Type>, resolver: &impl TypeResolver) -> DebugValue {
+fn serialize_value(val: &Value, ty: Option<&Type>, resolver: &impl TypeResolver) -> DebugValue {
     match (val, ty) {
         (
             Value::ContainerRef(r),
