@@ -2,7 +2,7 @@ mod helpers;
 
 use aptos_dap::server::RunCommand;
 use expect_test::expect;
-use helpers::{build_test_package, test_mode, DapTestServer, RECV_TIMEOUT};
+use helpers::{DapTestServer, RECV_TIMEOUT, build_test_package, test_mode};
 use std::time::Duration;
 
 #[test]
@@ -25,7 +25,9 @@ module 0x42::test {
     let mut t = DapTestServer::start(test_mode(&pkg));
     t.initialize_and_launch_test(&pkg);
 
-    t.assert_frame_scopes(0, expect![[r#"
+    t.assert_frame_scopes(
+        0,
+        expect![[r#"
         [
           {
             "name": "Locals",
@@ -33,8 +35,11 @@ module 0x42::test {
             "variablesReference": 1000,
             "expensive": false
           }
-        ]"#]]);
-    t.assert_frame_scopes(1, expect![[r#"
+        ]"#]],
+    );
+    t.assert_frame_scopes(
+        1,
+        expect![[r#"
         [
           {
             "name": "Locals",
@@ -42,9 +47,12 @@ module 0x42::test {
             "variablesReference": 1001,
             "expensive": false
           }
-        ]"#]]);
+        ]"#]],
+    );
 
-    t.assert_frame_variables(0, expect![[r#"
+    t.assert_frame_variables(
+        0,
+        expect![[r#"
         [
           {
             "name": "a",
@@ -56,15 +64,19 @@ module 0x42::test {
             "value": "signer(0x1)",
             "variablesReference": 0
           }
-        ]"#]]);
-    t.assert_frame_variables(1, expect![[r#"
+        ]"#]],
+    );
+    t.assert_frame_variables(
+        1,
+        expect![[r#"
         [
           {
             "name": "acc",
             "value": "signer(0x1)",
             "variablesReference": 0
           }
-        ]"#]]);
+        ]"#]],
+    );
 }
 
 #[test]
@@ -176,14 +188,17 @@ module 0x42::test {
     let mut t = DapTestServer::start(test_mode(&pkg));
     t.initialize_and_launch_test(&pkg);
 
-    t.assert_frame_variables(0, expect![[r#"
+    t.assert_frame_variables(
+        0,
+        expect![[r#"
         [
           {
             "name": "y",
             "value": "222",
             "variablesReference": 0
           }
-        ]"#]]);
+        ]"#]],
+    );
 }
 
 #[test]
@@ -214,7 +229,9 @@ module 0x42::test {
     let mut t = DapTestServer::start(test_mode(&pkg));
     t.initialize_and_launch_test(&pkg);
 
-    t.assert_frame_variables(0, expect![[r#"
+    t.assert_frame_variables(
+        0,
+        expect![[r#"
         [
           {
             "name": "my_bool",
@@ -246,7 +263,8 @@ module 0x42::test {
             "value": "[1, 2, 3]",
             "variablesReference": 100000
           }
-        ]"#]]);
+        ]"#]],
+    );
 }
 
 #[test]
@@ -276,14 +294,17 @@ module 0x42::test {
     let mut t = DapTestServer::start(test_mode(&pkg));
     t.initialize_and_launch_test(&pkg);
 
-    t.assert_frame_variables(0, expect![[r#"
+    t.assert_frame_variables(
+        0,
+        expect![[r#"
 [
   {
     "name": "o",
     "value": "Outer { inner: Inner { x: 100, y: true }, tag: 7 }",
     "variablesReference": 100000
   }
-]"#]]);
+]"#]],
+    );
 }
 
 #[test]
@@ -314,14 +335,17 @@ module 0x42::test {
     let mut t = DapTestServer::start(test_mode(&pkg));
     t.initialize_and_launch_test(&pkg);
 
-    t.assert_frame_variables(0, expect![[r#"
+    t.assert_frame_variables(
+        0,
+        expect![[r#"
         [
           {
             "name": "s",
             "value": "CopyStruct { val: 42 }",
             "variablesReference": 100000
           }
-        ]"#]]);
+        ]"#]],
+    );
 }
 
 #[test]
@@ -616,7 +640,9 @@ module 0x42::test {
     let mut t = DapTestServer::start(test_mode(&pkg));
     t.initialize_and_launch_test(&pkg);
 
-    t.assert_frame_variables(0, expect![[r#"
+    t.assert_frame_variables(
+        0,
+        expect![[r#"
         [
           {
             "name": "a",
@@ -628,10 +654,13 @@ module 0x42::test {
             "value": "20",
             "variablesReference": 0
           }
-        ]"#]]);
+        ]"#]],
+    );
 
     t.step_over();
-    t.assert_frame_variables(0, expect![[r#"
+    t.assert_frame_variables(
+        0,
+        expect![[r#"
         [
           {
             "name": "a",
@@ -648,10 +677,13 @@ module 0x42::test {
             "value": "30",
             "variablesReference": 0
           }
-        ]"#]]);
+        ]"#]],
+    );
 
     t.step_over();
-    t.assert_frame_variables(0, expect![[r#"
+    t.assert_frame_variables(
+        0,
+        expect![[r#"
         [
           {
             "name": "a",
@@ -673,10 +705,13 @@ module 0x42::test {
             "value": "60",
             "variablesReference": 0
           }
-        ]"#]]);
+        ]"#]],
+    );
 
     t.step_over();
-    t.assert_frame_variables(0, expect![[r#"
+    t.assert_frame_variables(
+        0,
+        expect![[r#"
         [
           {
             "name": "a",
@@ -703,7 +738,8 @@ module 0x42::test {
             "value": "61",
             "variablesReference": 0
           }
-        ]"#]]);
+        ]"#]],
+    );
 }
 
 #[test]
@@ -726,14 +762,17 @@ module 0x42::test {
     let mut t = DapTestServer::start(test_mode(&pkg));
     t.initialize_and_launch_test(&pkg);
 
-    t.assert_frame_variables(0, expect![[r#"
+    t.assert_frame_variables(
+        0,
+        expect![[r#"
         [
           {
             "name": "_s",
             "value": "(&) signer(0x1)",
             "variablesReference": 100000
           }
-        ]"#]]);
+        ]"#]],
+    );
 }
 
 #[test]
@@ -759,14 +798,17 @@ module 0x42::test {
     let mut t = DapTestServer::start(test_mode(&pkg));
     t.initialize_and_launch_test(&pkg);
 
-    t.assert_frame_variables(0, expect![[r#"
+    t.assert_frame_variables(
+        0,
+        expect![[r#"
         [
           {
             "name": "s",
             "value": "signer(0x1)",
             "variablesReference": 0
           }
-        ]"#]]);
+        ]"#]],
+    );
 }
 
 #[test]
@@ -800,14 +842,17 @@ module 0x42::test {
     let mut t = DapTestServer::start(test_mode(&pkg));
     t.initialize_and_launch_test(&pkg);
 
-    t.assert_frame_variables(0, expect![[r#"
+    t.assert_frame_variables(
+        0,
+        expect![[r#"
         [
           {
             "name": "s",
             "value": "\"hello world\"",
             "variablesReference": 0
           }
-        ]"#]]);
+        ]"#]],
+    );
 }
 
 #[test]
@@ -854,14 +899,17 @@ module 0x42::test {
           }
         ]"#]]);
 
-    t.assert_variables(100000, expect![[r#"
+    t.assert_variables(
+        100000,
+        expect![[r#"
         [
           {
             "name": "inner",
             "value": "000000000000000000000000000000000000000000000000000000000000cafe",
             "variablesReference": 0
           }
-        ]"#]]);
+        ]"#]],
+    );
 }
 
 #[test]

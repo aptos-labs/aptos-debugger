@@ -6,7 +6,7 @@ use aptos_move_cli::{
 };
 use aptos_types::on_chain_config::aptos_test_feature_flags_genesis;
 use aptos_vm_environment::prod_configs::set_debugging_enabled;
-use move_vm_debugger::{create_dap_channels, DapDebugContext, DapEvent};
+use move_vm_debugger::{DapDebugContext, DapEvent, create_dap_channels};
 use move_vm_runtime::{source_locator, tracing};
 use std::{io, path::PathBuf, sync::Arc, thread};
 
@@ -85,16 +85,16 @@ impl<R: io::Read, W: io::Write> DapServer<R, W> {
                     Ok(move_unit_test::package_test::UnitTestResult::Success) => {
                         eprintln!("aptos-dap: test passed");
                         None
-                    },
+                    }
                     Ok(move_unit_test::package_test::UnitTestResult::Failure) => {
                         eprintln!("aptos-dap: test failed");
                         Some("Test failed".to_string())
-                    },
+                    }
                     Err(e) => {
                         let msg = format!("{e:#}");
                         eprintln!("aptos-dap: test error: {msg}");
                         Some(msg)
-                    },
+                    }
                 };
 
                 let _ = evt_tx.send(DapEvent::Terminated { message });
@@ -132,7 +132,7 @@ fn build_aptos_source_locator(
         Err(e) => {
             eprintln!("aptos-dap: could not compile package for source maps: {e:#}");
             return None;
-        },
+        }
     };
 
     let mut locator = AptosSourceLocator::new();

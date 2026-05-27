@@ -86,7 +86,7 @@ fn main() -> anyhow::Result<()> {
                 skip_fetch_latest_git_deps: args.common.skip_fetch_latest_git_deps,
             };
             (mode, args.common)
-        },
+        }
         Command::Replay(args) => {
             let named_addresses: BTreeMap<String, aptos_types::account_address::AccountAddress> =
                 args.named_addresses
@@ -107,7 +107,7 @@ fn main() -> anyhow::Result<()> {
                 skip_fetch_latest_git_deps: args.common.skip_fetch_latest_git_deps,
             };
             (mode, args.common)
-        },
+        }
     };
 
     if let Some(port) = common.port {
@@ -140,11 +140,11 @@ fn run_tcp(port: u16, mode: RunCommand) -> anyhow::Result<()> {
                 stream.set_read_timeout(None)?;
                 eprintln!("aptos-dap: client connected from {addr}");
                 break stream;
-            },
+            }
             _ => {
                 eprintln!("aptos-dap: probe connection from {addr}, ignoring");
                 continue;
-            },
+            }
         }
     };
     let input = BufReader::new(stream.try_clone()?);

@@ -1,4 +1,4 @@
-use aptos_dap::server::{variables::frame_locals_ref_id, DapServer, RunCommand};
+use aptos_dap::server::{DapServer, RunCommand, variables::frame_locals_ref_id};
 use indexmap::IndexMap;
 use std::{
     collections::BTreeMap,
@@ -13,8 +13,7 @@ fn sanitize_frame(frame: &serde_json::Value) -> serde_json::Value {
     let mut f = frame.clone();
     if let Some(path) = f["source"]["path"].as_str() {
         let re = regex::Regex::new(r"/tmp/dap_tests/[^/]+/").unwrap();
-        f["source"]["path"] =
-            serde_json::Value::String(re.replace(path, "$$TMPDIR/").to_string());
+        f["source"]["path"] = serde_json::Value::String(re.replace(path, "$$TMPDIR/").to_string());
     }
     f
 }
@@ -401,7 +400,7 @@ impl DapTestServer {
                 match m["event"].as_str() {
                     Some("stopped") => return true,
                     Some("terminated") => return false,
-                    _ => {},
+                    _ => {}
                 }
             }
         }

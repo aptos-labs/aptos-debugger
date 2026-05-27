@@ -95,7 +95,7 @@ mod tests {
                     assert!(matches!(reason, StopReason::Step));
                     assert_eq!(state.function_name, "test_module::test_fn::0");
                     assert_eq!(state.pc, 0);
-                },
+                }
                 _ => panic!("expected Stopped event"),
             }
             cmd_tx.send(DapCommand::Step(1)).unwrap();

@@ -42,11 +42,11 @@ impl StoredVariables {
                     Some(vm_state) => self.locals_for_frame(frame_id, vm_state),
                     None => vec![],
                 }
-            },
+            }
             EXPANDABLE_VARS_OFFSET.. => {
                 let var_ref_idx = (variable_ref_id - EXPANDABLE_VARS_OFFSET) as usize;
                 self.expanded_children(var_ref_idx)
-            },
+            }
             _ => vec![],
         }
     }
@@ -73,7 +73,7 @@ impl StoredVariables {
                     variables_reference: ref_id,
                     ..proto::var(name, display)
                 }
-            },
+            }
         }
     }
 
@@ -93,10 +93,10 @@ impl StoredVariables {
                 .collect(),
             DebugValue::ContainerRef(inner) => {
                 vec![self.debug_value_to_variable("*ref".to_string(), inner)]
-            },
+            }
             DebugValue::IndexedRef(inner) => {
                 vec![self.debug_value_to_variable("*ref".to_string(), inner)]
-            },
+            }
             DebugValue::Primitive(_)
             | DebugValue::Address(_)
             | DebugValue::Signer(_)

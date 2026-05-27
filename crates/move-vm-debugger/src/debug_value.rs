@@ -1,19 +1,17 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use move_binary_format::errors::PartialVMResult;
 use move_core_types::{
     account_address::AccountAddress, identifier::Identifier, language_storage::ModuleId,
-    value::MASTER_ADDRESS_FIELD_OFFSET, vm_status::StatusCode,
+    value::MASTER_ADDRESS_FIELD_OFFSET,
 };
 use move_vm_types::{
     loaded_data::runtime_types::Type,
     values::{
-        values_impl::{Container, IndexedRef, Value},
         Locals,
+        values_impl::{Container, IndexedRef, Value},
     },
 };
-use std::fmt;
 
 #[derive(Debug, Clone)]
 pub enum DebugValue {
@@ -42,9 +40,13 @@ impl std::fmt::Display for DebugValue {
             DebugValue::Invalid => write!(f, "-"),
             DebugValue::Primitive(s) | DebugValue::Address(s) | DebugValue::Error(s) => {
                 write!(f, "{}", s)
-            },
+            }
             DebugValue::Signer(addr) => write!(f, "signer({addr})"),
-            DebugValue::Struct { name, ty_args, fields } => {
+            DebugValue::Struct {
+                name,
+                ty_args,
+                fields,
+            } => {
                 if let Some(n) = name {
                     write!(f, "{}", n)?;
                     if !ty_args.is_empty() {
@@ -64,7 +66,7 @@ impl std::fmt::Display for DebugValue {
                     }
                 }
                 write!(f, " }}")
-            },
+            }
             DebugValue::EnumVariant(name, fields) => {
                 if fields.is_empty() {
                     write!(f, "{}", name)
@@ -78,7 +80,7 @@ impl std::fmt::Display for DebugValue {
                     }
                     write!(f, " }}")
                 }
-            },
+            }
             DebugValue::Vector(items) => {
                 write!(f, "[")?;
                 for (i, item) in items.iter().enumerate() {
@@ -88,10 +90,10 @@ impl std::fmt::Display for DebugValue {
                     write!(f, "{}", item)?;
                 }
                 write!(f, "]")
-            },
+            }
             DebugValue::ContainerRef(inner) => {
                 write!(f, "(&) {}", inner)
-            },
+            }
             DebugValue::IndexedRef(inner) => write!(f, "{}", inner),
             DebugValue::MoveString(s) => write!(f, "\"{}\"", s),
             DebugValue::Closure(s) => write!(f, "{}", s),
@@ -139,11 +141,9 @@ pub fn format_type(ty: &Type, resolver: &impl TypeResolver) -> String {
         Type::Vector(inner) => format!("vector<{}>", format_type(inner, resolver)),
         Type::Reference(inner) => format!("&{}", format_type(inner, resolver)),
         Type::MutableReference(inner) => format!("&mut {}", format_type(inner, resolver)),
-        Type::Struct { .. } | Type::StructInstantiation { .. } => {
-            match resolver.get_adt_name(ty) {
-                Some((_, name)) => name.to_string(),
-                None => "?".into(),
-            }
+        Type::Struct { .. } | Type::StructInstantiation { .. } => match resolver.get_adt_name(ty) {
+            Some((_, name)) => name.to_string(),
+            None => "?".into(),
         },
         _ => "?".into(),
     }
@@ -157,7 +157,7 @@ fn format_ty_args(ty: &Type, resolver: &impl TypeResolver) -> Vec<String> {
     match ty {
         Type::StructInstantiation { ty_args, .. } => {
             ty_args.iter().map(|t| format_type(t, resolver)).collect()
-        },
+        }
         _ => vec![],
     }
 }
@@ -208,7 +208,7 @@ fn serialize_value_untyped(val: &Value) -> DebugValue {
         Value::Container(c) => serialize_container_untyped(c),
         Value::ContainerRef(r) => {
             DebugValue::ContainerRef(Box::new(serialize_container_untyped(r.container())))
-        },
+        }
         Value::IndexedRef(r) => DebugValue::IndexedRef(Box::new(serialize_indexed_ref(r))),
         Value::ClosureValue(c) => DebugValue::Closure(c.to_string()),
         Value::DelayedFieldID { .. } => DebugValue::Delayed,
@@ -255,10 +255,10 @@ fn serialize_adt(fields: &[Value], ty: &Type, resolver: &impl TypeResolver) -> D
                 Some((variant_name, variant_fields)) => {
                     let children = serialize_fields(&fields[1..], variant_fields, resolver);
                     DebugValue::EnumVariant(variant_name.clone(), children)
-                },
+                }
                 None => DebugValue::Error("enum(<unknown tag>)".into()),
             }
-        },
+        }
         Some(AdtInfo::Struct { fields: adt_fields }) => {
             let children = serialize_fields(fields, &adt_fields, resolver);
             DebugValue::Struct {
@@ -266,7 +266,7 @@ fn serialize_adt(fields: &[Value], ty: &Type, resolver: &impl TypeResolver) -> D
                 ty_args: format_ty_args(ty, resolver),
                 fields: children,
             }
-        },
+        }
         None => {
             let children = fields
                 .iter()
@@ -277,7 +277,7 @@ fn serialize_adt(fields: &[Value], ty: &Type, resolver: &impl TypeResolver) -> D
                 ty_args: format_ty_args(ty, resolver),
                 fields: children,
             }
-        },
+        }
     }
 }
 
@@ -288,7 +288,7 @@ fn serialize_move_string(fields: &[Value]) -> Option<DebugValue> {
             std::str::from_utf8(&bytes)
                 .ok()
                 .map(|s| DebugValue::MoveString(s.to_owned()))
-        },
+        }
         _ => None,
     }
 }
@@ -315,7 +315,7 @@ fn serialize_container_untyped(c: &Container) -> DebugValue {
     match c {
         Container::Vec(r) => {
             DebugValue::Vector(r.borrow().iter().map(serialize_value_untyped).collect())
-        },
+        }
         Container::VecU8(r) => typed_vec(&r.borrow()),
         Container::VecU16(r) => typed_vec(&r.borrow()),
         Container::VecU32(r) => typed_vec(&r.borrow()),
@@ -336,8 +336,12 @@ fn serialize_container_untyped(c: &Container) -> DebugValue {
                 .iter()
                 .map(|fv| (String::new(), serialize_value_untyped(fv)))
                 .collect();
-            DebugValue::Struct { name: None, ty_args: vec![], fields: children }
-        },
+            DebugValue::Struct {
+                name: None,
+                ty_args: vec![],
+                fields: children,
+            }
+        }
         Container::Locals(_) => DebugValue::Error("...".into()),
     }
 }
@@ -354,49 +358,49 @@ fn serialize_indexed_ref(r: &IndexedRef) -> DebugValue {
     match r.container_ref.container() {
         Container::Locals(r) | Container::Vec(r) | Container::Struct(r) => {
             serialize_slice_elem(&r.borrow(), idx, serialize_value_untyped)
-        },
+        }
         Container::VecU8(r) => {
             serialize_slice_elem(&r.borrow(), idx, |x| DebugValue::Primitive(x.to_string()))
-        },
+        }
         Container::VecU16(r) => {
             serialize_slice_elem(&r.borrow(), idx, |x| DebugValue::Primitive(x.to_string()))
-        },
+        }
         Container::VecU32(r) => {
             serialize_slice_elem(&r.borrow(), idx, |x| DebugValue::Primitive(x.to_string()))
-        },
+        }
         Container::VecU64(r) => {
             serialize_slice_elem(&r.borrow(), idx, |x| DebugValue::Primitive(x.to_string()))
-        },
+        }
         Container::VecU128(r) => {
             serialize_slice_elem(&r.borrow(), idx, |x| DebugValue::Primitive(x.to_string()))
-        },
+        }
         Container::VecU256(r) => {
             serialize_slice_elem(&r.borrow(), idx, |x| DebugValue::Primitive(x.to_string()))
-        },
+        }
         Container::VecI8(r) => {
             serialize_slice_elem(&r.borrow(), idx, |x| DebugValue::Primitive(x.to_string()))
-        },
+        }
         Container::VecI16(r) => {
             serialize_slice_elem(&r.borrow(), idx, |x| DebugValue::Primitive(x.to_string()))
-        },
+        }
         Container::VecI32(r) => {
             serialize_slice_elem(&r.borrow(), idx, |x| DebugValue::Primitive(x.to_string()))
-        },
+        }
         Container::VecI64(r) => {
             serialize_slice_elem(&r.borrow(), idx, |x| DebugValue::Primitive(x.to_string()))
-        },
+        }
         Container::VecI128(r) => {
             serialize_slice_elem(&r.borrow(), idx, |x| DebugValue::Primitive(x.to_string()))
-        },
+        }
         Container::VecI256(r) => {
             serialize_slice_elem(&r.borrow(), idx, |x| DebugValue::Primitive(x.to_string()))
-        },
+        }
         Container::VecBool(r) => {
             serialize_slice_elem(&r.borrow(), idx, |x| DebugValue::Primitive(x.to_string()))
-        },
+        }
         Container::VecAddress(r) => {
             serialize_slice_elem(&r.borrow(), idx, |x| DebugValue::Address(x.to_hex()))
-        },
+        }
     }
 }
 
@@ -455,17 +459,23 @@ mod tests {
         ) -> Self {
             let mut adt_infos = BTreeMap::new();
             for (ty, names) in struct_fields {
-                adt_infos.insert(ty, AdtInfo::Struct {
-                    fields: names_to_field_infos(names),
-                });
+                adt_infos.insert(
+                    ty,
+                    AdtInfo::Struct {
+                        fields: names_to_field_infos(names),
+                    },
+                );
             }
             for (ty, variants) in enum_variants {
-                adt_infos.insert(ty, AdtInfo::Enum {
-                    variants: variants
-                        .into_iter()
-                        .map(|(name, field_names)| (name, names_to_field_infos(field_names)))
-                        .collect(),
-                });
+                adt_infos.insert(
+                    ty,
+                    AdtInfo::Enum {
+                        variants: variants
+                            .into_iter()
+                            .map(|(name, field_names)| (name, names_to_field_infos(field_names)))
+                            .collect(),
+                    },
+                );
             }
             Self {
                 struct_names: BTreeMap::new(),
@@ -597,18 +607,19 @@ mod tests {
     #[test]
     fn test_struct_with_name_and_ty_args() {
         let ty = dummy_struct_ty(1);
-        let resolver =
-            MockTypeResolver::new(vec![(ty.clone(), vec!["val".into()])], vec![])
-                .with_struct_name(
-                    ty.clone(),
-                    ModuleId::new(AccountAddress::ONE, Identifier::new("coin").unwrap()),
-                    Identifier::new("Coin").unwrap(),
-                );
+        let resolver = MockTypeResolver::new(vec![(ty.clone(), vec!["val".into()])], vec![])
+            .with_struct_name(
+                ty.clone(),
+                ModuleId::new(AccountAddress::ONE, Identifier::new("coin").unwrap()),
+                Identifier::new("Coin").unwrap(),
+            );
 
         let val = Value::struct_(Struct::pack(vec![Value::u64(100)]));
         let dv = sv(&val, &ty, &resolver);
-        assert!(matches!(&dv, DebugValue::Struct { name: Some(n), ty_args, .. }
-            if n == "Coin" && ty_args.is_empty()));
+        assert!(
+            matches!(&dv, DebugValue::Struct { name: Some(n), ty_args, .. }
+            if n == "Coin" && ty_args.is_empty())
+        );
         assert_eq!(dv.to_string(), "Coin { val: 100 }");
     }
 
@@ -647,10 +658,16 @@ mod tests {
     #[test]
     fn test_enum() {
         let ty = dummy_enum_ty();
-        let resolver = MockTypeResolver::new(vec![], vec![(ty.clone(), vec![
-            ("None".into(), vec![]),
-            ("Some".into(), vec!["value".into()]),
-        ])]);
+        let resolver = MockTypeResolver::new(
+            vec![],
+            vec![(
+                ty.clone(),
+                vec![
+                    ("None".into(), vec![]),
+                    ("Some".into(), vec!["value".into()]),
+                ],
+            )],
+        );
 
         // no fields
         let val = Value::struct_(Struct::pack_variant(0, vec![]));
@@ -721,10 +738,13 @@ mod tests {
         let struct_ty = dummy_struct_ty(1);
         let resolver = MockTypeResolver::new(
             vec![(struct_ty.clone(), vec!["x".into(), "y".into()])],
-            vec![(enum_ty.clone(), vec![
-                ("First".into(), vec![]),
-                ("Second".into(), vec!["_0".into()]),
-            ])],
+            vec![(
+                enum_ty.clone(),
+                vec![
+                    ("First".into(), vec![]),
+                    ("Second".into(), vec!["_0".into()]),
+                ],
+            )],
         );
 
         // enum ref

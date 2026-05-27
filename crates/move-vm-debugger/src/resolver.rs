@@ -1,8 +1,7 @@
-use move_core_types::{identifier::Identifier, language_storage::ModuleId};
 use crate::debug_value::{AdtInfo, FieldInfo, TypeResolver};
+use move_core_types::{identifier::Identifier, language_storage::ModuleId};
 use move_vm_runtime::{
-    debug::InterpreterDebugInterface,
-    source_locator, LoadedFunction, RuntimeEnvironment,
+    LoadedFunction, RuntimeEnvironment, debug::InterpreterDebugInterface, source_locator,
 };
 use move_vm_types::loaded_data::runtime_types::Type;
 
@@ -34,7 +33,7 @@ impl TypeResolver for LocatorTypeResolver<'_> {
         let struct_type = match ty {
             Type::Struct { idx, .. } | Type::StructInstantiation { idx, .. } => {
                 self.interpreter.load_struct_type(idx)
-            },
+            }
             _ => None,
         };
 
@@ -57,7 +56,7 @@ impl TypeResolver for LocatorTypeResolver<'_> {
                 Some(AdtInfo::Enum {
                     variants: adt_variants,
                 })
-            },
+            }
             None => {
                 let source_names =
                     source_locator::get_struct_field_names(&module_id, struct_name.as_str())?;
@@ -66,7 +65,7 @@ impl TypeResolver for LocatorTypeResolver<'_> {
                     struct_type.and_then(|st| st.fields(None).ok().map(|f| f.to_vec()));
                 let fields = merge_field_names_and_types(&source_names, field_types.as_deref());
                 Some(AdtInfo::Struct { fields })
-            },
+            }
         }
     }
 }

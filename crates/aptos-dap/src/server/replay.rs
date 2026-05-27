@@ -2,8 +2,8 @@ use crate::{proto, server::DapServer};
 use anyhow::bail;
 use aptos_move_cli::source_locator::AptosSourceLocator;
 use aptos_move_debugger::aptos_debugger::AptosDebugger;
-use aptos_rest_client::{AptosBaseUrl, Client};
 use aptos_resource_viewer::module_view::CachedModuleView;
+use aptos_rest_client::{AptosBaseUrl, Client};
 use aptos_types::transaction::{
     PersistedAuxiliaryInfo, SignedTransaction, Transaction, TransactionInfo, TransactionPayload,
 };
@@ -12,13 +12,7 @@ use dap::types::Variable;
 use move_resource_viewer::MoveValueAnnotator;
 use move_vm_debugger::{DapDebugContext, DapEvent, DebugValue, create_dap_channels};
 use move_vm_runtime::{source_locator, tracing};
-use std::{
-    collections::BTreeMap,
-    io,
-    path::PathBuf,
-    sync::Arc,
-    thread,
-};
+use std::{collections::BTreeMap, io, path::PathBuf, sync::Arc, thread};
 use url::Url;
 
 pub(crate) const SCOPE_TRANSACTION_INFO: i64 = 1;
@@ -294,7 +288,6 @@ fn transaction_info_variables_static(txn_session: &ReplayTransactionSession) -> 
     ]
 }
 
-
 fn annotated_to_debug_value(v: &move_resource_viewer::AnnotatedMoveValue) -> DebugValue {
     use move_resource_viewer::AnnotatedMoveValue;
     match v {
@@ -379,8 +372,12 @@ fn decode_entry_function_args(
     let state_view = debugger.state_view_at_version(txn_id);
     let module_viewer = CachedModuleView::new(state_view);
     let annotator = MoveValueAnnotator::new(module_viewer);
-    let decoded =
-        annotator.view_function_arguments(entry_fn.module(), entry_fn.function(), entry_fn.ty_args(), entry_fn.args());
+    let decoded = annotator.view_function_arguments(
+        entry_fn.module(),
+        entry_fn.function(),
+        entry_fn.ty_args(),
+        entry_fn.args(),
+    );
 
     for (i, arg) in entry_fn.args().iter().enumerate() {
         let value = decoded

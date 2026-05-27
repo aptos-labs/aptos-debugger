@@ -2,7 +2,7 @@ use crate::{
     proto,
     server::{
         replay::{ReplayTransactionSession, SCOPE_TRANSACTION_INFO},
-        variables::{frame_locals_ref_id, StoredVariables},
+        variables::{StoredVariables, frame_locals_ref_id},
     },
     utils::{parse_source_location, trim_hex_address},
 };
@@ -98,7 +98,7 @@ impl<R: io::Read, W: io::Write> DapServer<R, W> {
                 _ => {
                     self.server.respond(req.error("unsupported command"))?;
                     Ok(())
-                },
+                }
             };
             if let Err(e) = result {
                 let _ = self.send_console(format_args!("error handling request: {e}"));
@@ -138,7 +138,7 @@ impl<R: io::Read, W: io::Write> DapServer<R, W> {
                     package_path.display(),
                     filter
                 ))?;
-            },
+            }
             RunCommand::Replay {
                 txn_id,
                 network,
@@ -168,7 +168,7 @@ impl<R: io::Read, W: io::Write> DapServer<R, W> {
                     ))?;
                 }
                 self.txn_session = Some(replay_txn_info);
-            },
+            }
         }
 
         self.server.respond(req.success(ResponseBody::Launch))?;
@@ -249,16 +249,16 @@ impl<R: io::Read, W: io::Write> DapServer<R, W> {
         }
 
         match self.wait_for_vm_event() {
-            Some(VmEventResult::Stopped(_)) => {},
+            Some(VmEventResult::Stopped(_)) => {}
             Some(VmEventResult::Terminated(msg)) => {
                 self.send_output_and_terminate(msg)?;
                 return Ok(());
-            },
+            }
             None => {
                 self.server
                     .send_event(dap::events::Event::Terminated(None))?;
                 return Ok(());
-            },
+            }
         }
 
         if !self.pending_breakpoints.is_empty() {
@@ -276,14 +276,14 @@ impl<R: io::Read, W: io::Write> DapServer<R, W> {
                     self.send_stop_reason_to_console(&reason)?;
                     self.server
                         .send_event(proto::stopped_event(proto::stop_reason_to_dap(&reason)))?;
-                },
+                }
                 Some(VmEventResult::Terminated(msg)) => {
                     self.send_output_and_terminate(msg)?;
-                },
+                }
                 None => {
                     self.server
                         .send_event(dap::events::Event::Terminated(None))?;
-                },
+                }
             }
         } else {
             self.send_stop_reason_to_console(&StopReason::Entry)?;
@@ -300,15 +300,15 @@ impl<R: io::Read, W: io::Write> DapServer<R, W> {
                 self.vm_stopped_state = Some(vm_state);
                 self.stored_variables.clear();
                 Some(VmEventResult::Stopped(reason))
-            },
+            }
             Ok(DapEvent::Terminated { message }) => {
                 self.vm_stopped_state = None;
                 Some(VmEventResult::Terminated(message))
-            },
+            }
             Err(_) => {
                 self.vm_stopped_state = None;
                 Some(VmEventResult::Terminated(None))
-            },
+            }
         }
     }
 
@@ -321,14 +321,14 @@ impl<R: io::Read, W: io::Write> DapServer<R, W> {
                 self.send_stop_reason_to_console(&reason)?;
                 self.server
                     .send_event(proto::stopped_event(proto::stop_reason_to_dap(&reason)))?;
-            },
+            }
             Some(VmEventResult::Terminated(msg)) => {
                 self.send_output_and_terminate(msg)?;
-            },
+            }
             None => {
                 self.server
                     .send_event(dap::events::Event::Terminated(None))?;
-            },
+            }
         }
         Ok(())
     }
@@ -572,13 +572,13 @@ impl<R: io::Read, W: io::Write> DapServer<R, W> {
             let msg = match reason {
                 StopReason::Breakpoint(name) => {
                     format!("Breakpoint hit: {name}")
-                },
+                }
                 StopReason::Entry => {
                     format!("Stopped at entry: {} at {location}", state.function_name)
-                },
+                }
                 StopReason::Step => {
                     format!("Stepped to: {} at {location}", state.function_name)
-                },
+                }
             };
             self.send_console(msg)?;
         }

@@ -1,3 +1,4 @@
+use crate::debug_value::DebugValue;
 use crate::{
     dap_types::{
         DapCommand, DapDebugHandle, DapEvent, DapFrameInfo, DapLocalInfo, StopReason,
@@ -5,10 +6,10 @@ use crate::{
     },
     resolver::{self, LocatorTypeResolver},
 };
-use crate::debug_value::DebugValue;
 use move_vm_runtime::{
+    LoadedFunction, RuntimeEnvironment,
     debug::{DebugContext, InterpreterDebugInterface, ThreadStateHandle},
-    source_locator, tracing, LoadedFunction, RuntimeEnvironment,
+    source_locator, tracing,
 };
 use move_vm_types::{instr::Instruction, values::Locals};
 use std::{
@@ -99,24 +100,24 @@ impl DapDebugContext {
                 Err(_) => {
                     self.current_op = DebuggerOp::Continue;
                     return;
-                },
+                }
             };
             match cmd {
                 DapCommand::Continue => {
                     self.current_op = DebuggerOp::Continue;
                     break;
-                },
+                }
                 DapCommand::Step(n) => {
                     self.current_op = DebuggerOp::StepRemaining(n);
                     break;
-                },
+                }
                 DapCommand::StepOver(_) => {
                     self.current_op = DebuggerOp::StepOverLine {
                         stack_depth: interpreter.get_stack_depth(),
                         start_source_loc: source_loc.clone(),
                     };
                     break;
-                },
+                }
                 DapCommand::StepOut => {
                     let stack_depth = interpreter.get_stack_depth();
                     if stack_depth == 0 {
@@ -127,10 +128,10 @@ impl DapDebugContext {
                         };
                     }
                     break;
-                },
+                }
                 DapCommand::SetBreakpoints(bps) => {
                     self.breakpoints = bps.into_iter().collect();
-                },
+                }
             }
         }
     }
@@ -152,23 +153,19 @@ impl DebugContext for DapDebugContext {
             Instruction::MoveLoc(idx) => {
                 let idx = *idx as usize;
                 if let Some(ty) = function.local_tys().get(idx) {
-                    let resolver = LocatorTypeResolver::new(
-                        runtime_environment,
-                        interpreter,
-                    );
-                    let sv = crate::debug_value::serialize_value_for_debug(
-                        locals, idx, ty, &resolver,
-                    );
+                    let resolver = LocatorTypeResolver::new(runtime_environment, interpreter);
+                    let sv =
+                        crate::debug_value::serialize_value_for_debug(locals, idx, ty, &resolver);
                     self.moved_locals
                         .entry(current_stack_depth)
                         .or_default()
                         .insert(idx, sv);
                 }
-            },
+            }
             Instruction::Ret => {
                 self.moved_locals.remove(&current_stack_depth);
-            },
-            _ => {},
+            }
+            _ => {}
         }
 
         let instr_string = format!("{:?}", instr);
@@ -187,7 +184,7 @@ impl DebugContext for DapDebugContext {
         let is_under_the_same_bp_sloc = match (&current_sloc, &self.last_breakpoint_sloc) {
             (Some(loc), Some((prev_bp_sloc, prev_bp_depth))) => {
                 loc == prev_bp_sloc && current_stack_depth == *prev_bp_depth
-            },
+            }
             _ => false,
         };
         let breakpoint_hit = !is_under_the_same_bp_sloc
@@ -205,7 +202,7 @@ impl DebugContext for DapDebugContext {
                     *n -= 1;
                     false
                 }
-            },
+            }
             DebuggerOp::StepOverLine {
                 stack_depth,
                 start_source_loc,
@@ -226,7 +223,7 @@ impl DebugContext for DapDebugContext {
                 } else {
                     false
                 }
-            },
+            }
             DebuggerOp::StepOut { target_stack_depth } => {
                 if *target_stack_depth == interpreter.get_stack_depth() {
                     self.current_op = DebuggerOp::Continue;
@@ -234,7 +231,7 @@ impl DebugContext for DapDebugContext {
                 } else {
                     false
                 }
-            },
+            }
             DebuggerOp::Continue => false,
         };
 
@@ -381,7 +378,7 @@ fn build_vm_stopped_state(
                         .map(|mid| format!("{}::{}", mid, func_def_idx))
                         .unwrap_or_else(|| format!("<script>::{}", func_def_idx));
                     (name, vec![])
-                },
+                }
             };
             DapFrameInfo {
                 function_name: frame_fname,
