@@ -34,7 +34,7 @@ enum DebuggerOp {
 pub struct DapDebugContext {
     event_tx: crossbeam_channel::Sender<DapEvent>,
     command_rx: crossbeam_channel::Receiver<DapCommand>,
-    current_op: DebuggerOp,
+    next_cmd_op: DebuggerOp,
     breakpoints: BTreeSet<String>,
     moved_locals: HashMap<usize, HashMap<usize, DebugValue>>,
     // (loc, stack depth)
@@ -46,7 +46,7 @@ impl DapDebugContext {
         Self {
             event_tx: handle.event_tx,
             command_rx: handle.command_rx,
-            current_op: DebuggerOp::Step,
+            next_cmd_op: DebuggerOp::Step,
             breakpoints: BTreeSet::new(),
             moved_locals: HashMap::new(),
             last_breakpoint_hit: None,
@@ -140,22 +140,21 @@ impl DebugContext for DapDebugContext {
             return;
         }
 
-        let stop_reason = match breakpoint_hit {
-            Some(breakpoint_hit) => StopReason::Breakpoint(breakpoint_hit),
-            None => StopReason::Step,
-        };
-
         let vm_stopped_state = build_vm_stopped_state(
             function,
             locals,
             pc,
             instr,
-            function.name_as_pretty_string(),
             runtime_environment,
             interpreter,
             &self.moved_locals,
         );
+        let stop_reason = match breakpoint_hit {
+            Some(breakpoint_hit) => StopReason::Breakpoint(breakpoint_hit),
+            None => StopReason::Step,
+        };
 
+        // send VM state
         if self
             .event_tx
             .send(DapEvent::Stopped {
@@ -164,49 +163,25 @@ impl DebugContext for DapDebugContext {
             })
             .is_err()
         {
-            self.current_op = DebuggerOp::RunUntilBreakpoint;
+            self.next_cmd_op = DebuggerOp::RunUntilBreakpoint;
             return;
         }
 
         loop {
+            // blocks until session sends another debugger command
             let cmd = match self.command_rx.recv() {
                 Ok(cmd) => cmd,
                 Err(_) => {
-                    self.current_op = DebuggerOp::RunUntilBreakpoint;
+                    self.next_cmd_op = DebuggerOp::RunUntilBreakpoint;
                     return;
                 }
             };
-            match cmd {
-                DapCommand::Continue => {
-                    self.current_op = DebuggerOp::RunUntilBreakpoint;
-                    break;
-                }
-                DapCommand::Step => {
-                    self.current_op = DebuggerOp::Step;
-                    break;
-                }
-                DapCommand::StepOver => {
-                    self.current_op = DebuggerOp::StepOverLine {
-                        line_stack_depth: current_stack_depth,
-                        line_sloc: current_line.clone(),
-                    };
-                    break;
-                }
-                DapCommand::StepOut => {
-                    let stack_depth = current_stack_depth;
-                    if stack_depth == 0 {
-                        self.current_op = DebuggerOp::RunUntilBreakpoint;
-                    } else {
-                        self.current_op = DebuggerOp::StepOut {
-                            target_stack_depth: stack_depth - 1,
-                        };
-                    }
-                    break;
-                }
-                DapCommand::SetBreakpoints(bps) => {
-                    self.breakpoints = bps.into_iter().collect();
-                }
+            if let DapCommand::SetBreakpoints(bps) = cmd {
+                self.breakpoints = bps.into_iter().collect();
+                continue;
             }
+            self.next_cmd_op = parse_cmd_op(cmd, current_stack_depth, current_line);
+            break;
         }
     }
 
@@ -258,7 +233,7 @@ impl DapDebugContext {
         current_source_line: Option<String>,
     ) -> bool {
         let current_stack_depth = interpreter.get_stack_depth();
-        let should_stop_after_op = match &self.current_op {
+        let should_stop_after_op = match &self.next_cmd_op {
             DebuggerOp::Step => true,
             DebuggerOp::StepOverLine {
                 line_stack_depth,
@@ -285,9 +260,35 @@ impl DapDebugContext {
             DebuggerOp::RunUntilBreakpoint => false,
         };
         if should_stop_after_op {
-            self.current_op = DebuggerOp::RunUntilBreakpoint;
+            self.next_cmd_op = DebuggerOp::RunUntilBreakpoint;
         }
         should_stop_after_op
+    }
+}
+
+fn parse_cmd_op(
+    cmd: DapCommand,
+    line_stack_depth: usize,
+    current_line: Option<String>,
+) -> DebuggerOp {
+    match cmd {
+        DapCommand::Continue => DebuggerOp::RunUntilBreakpoint,
+        DapCommand::Step => DebuggerOp::Step,
+        DapCommand::StepOver => DebuggerOp::StepOverLine {
+            line_stack_depth,
+            line_sloc: current_line.clone(),
+        },
+        DapCommand::StepOut => {
+            let stack_depth = line_stack_depth;
+            if stack_depth == 0 {
+                DebuggerOp::RunUntilBreakpoint
+            } else {
+                DebuggerOp::StepOut {
+                    target_stack_depth: stack_depth - 1,
+                }
+            }
+        }
+        DapCommand::SetBreakpoints(_) => unreachable!(),
     }
 }
 
@@ -348,7 +349,6 @@ fn build_vm_stopped_state(
     locals: &Locals,
     pc: u16,
     instr: &Instruction,
-    fq_function_name: String,
     runtime_environment: &RuntimeEnvironment,
     interpreter: &dyn InterpreterDebugInterface,
     moved_locals: &HashMap<usize, HashMap<usize, DebugValue>>,
@@ -407,7 +407,7 @@ fn build_vm_stopped_state(
     );
 
     VmStoppedState {
-        function_name: fq_function_name.to_string(),
+        function_name: function.name_as_pretty_string(),
         pc,
         instruction: format!("{:?}", instr),
         dap_stack_trace,
