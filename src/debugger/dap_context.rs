@@ -8,9 +8,9 @@ use crate::debugger::{
     resolver::{self, LocatorTypeResolver},
 };
 use move_vm_runtime::{
-    debug::{DebugContext, InterpreterDebugInterface, ThreadStateHandle}, source_locator,
-    tracing,
     LoadedFunction, RuntimeEnvironment,
+    debug::{DebugContext, InterpreterDebugInterface, ThreadStateHandle},
+    source_locator, tracing,
 };
 use move_vm_types::{instr::Instruction, values::Locals};
 use std::{
@@ -59,82 +59,19 @@ impl DapDebugContext {
         }
     }
 
-    fn apply_dap_command_queue(
-        &mut self,
-        function: &LoadedFunction,
-        locals: &Locals,
-        pc: u16,
-        runtime_environment: &RuntimeEnvironment,
-        interpreter: &dyn InterpreterDebugInterface,
-        instr_string: &str,
-        fq_function_name: &str,
-        stop_reason: StopReason,
-        source_loc: &Option<String>,
-    ) {
-        let vm_stopped_state = build_vm_stopped_state(
-            function,
-            locals,
-            pc,
-            instr_string,
-            fq_function_name,
-            runtime_environment,
-            interpreter,
-            &self.moved_locals,
-        );
-
-        if self
-            .event_tx
-            .send(DapEvent::Stopped {
-                reason: stop_reason,
-                vm_state: vm_stopped_state,
-            })
-            .is_err()
-        {
-            self.current_op = DebuggerOp::Continue;
-            return;
-        }
-
-        loop {
-            let cmd = match self.command_rx.recv() {
-                Ok(cmd) => cmd,
-                Err(_) => {
-                    self.current_op = DebuggerOp::Continue;
-                    return;
-                }
-            };
-            match cmd {
-                DapCommand::Continue => {
-                    self.current_op = DebuggerOp::Continue;
-                    break;
-                }
-                DapCommand::Step => {
-                    self.current_op = DebuggerOp::Step;
-                    break;
-                }
-                DapCommand::StepOver => {
-                    self.current_op = DebuggerOp::StepOverLine {
-                        stack_depth: interpreter.get_stack_depth(),
-                        start_source_loc: source_loc.clone(),
-                    };
-                    break;
-                }
-                DapCommand::StepOut => {
-                    let stack_depth = interpreter.get_stack_depth();
-                    if stack_depth == 0 {
-                        self.current_op = DebuggerOp::Continue;
-                    } else {
-                        self.current_op = DebuggerOp::StepOut {
-                            target_stack_depth: stack_depth - 1,
-                        };
-                    }
-                    break;
-                }
-                DapCommand::SetBreakpoints(bps) => {
-                    self.breakpoints = bps.into_iter().collect();
-                }
-            }
-        }
-    }
+    // fn apply_dap_command_queue(
+    //     &mut self,
+    //     function: &LoadedFunction,
+    //     locals: &Locals,
+    //     pc: u16,
+    //     runtime_environment: &RuntimeEnvironment,
+    //     interpreter: &dyn InterpreterDebugInterface,
+    //     instr_string: &str,
+    //     fq_function_name: &str,
+    //     stop_reason: StopReason,
+    //     source_loc: &Option<String>,
+    // ) {
+    // }
 }
 
 impl DebugContext for DapDebugContext {
@@ -148,43 +85,24 @@ impl DebugContext for DapDebugContext {
         runtime_environment: &RuntimeEnvironment,
         interpreter: &dyn InterpreterDebugInterface,
     ) {
+        // After each variable is "moved" throughout the execution, it disappears from Locals.
+        // We still want to be able to inspect it from the Variables, so we save all of those for later.
+        self.handle_potentially_moved_locals(
+            function,
+            locals,
+            instr,
+            runtime_environment,
+            interpreter,
+        );
+
         let current_stack_depth = interpreter.get_stack_depth();
-
-        match instr {
-            // After each variable is "moved" throughout the execution, it disappears from Locals.
-            // We still want to be able to inspect it from the Variables, so we save all of those in `self.moved_locals`.
-            Instruction::MoveLoc(local_idx) => {
-                let local_idx = *local_idx as usize;
-                if let Some(local_ty) = function.local_tys().get(local_idx) {
-                    let type_resolver = LocatorTypeResolver::new(runtime_environment, interpreter);
-                    let dv = debug_value::serialize_local_value(
-                        locals,
-                        local_idx,
-                        local_ty,
-                        &type_resolver,
-                    );
-                    // we save locals only on specific `current_stack_depth`, and clear those on `Ret` later
-                    self.moved_locals
-                        .entry(current_stack_depth)
-                        .or_default()
-                        .insert(local_idx, dv);
-                }
-            }
-            Instruction::Ret => {
-                self.moved_locals.remove(&current_stack_depth);
-            }
-            _ => (),
-        }
-
-        let instr_string = format!("{:?}", instr);
-        let fq_function_name = function.name_as_pretty_string();
         let current_sloc = function.module_id().and_then(|mid| {
             source_locator::get_bytecode_source_location(mid, function.index(), pc)
         });
 
-        if let Some((ref prev_bp_sloc, prev_bp_depth)) = self.last_breakpoint_sloc {
-            if current_stack_depth <= prev_bp_depth
-                && current_sloc.as_deref() != Some(prev_bp_sloc.as_str())
+        if let Some((ref prev_bp_line, prev_bp_stack_depth)) = self.last_breakpoint_sloc {
+            if current_stack_depth <= prev_bp_stack_depth
+                && current_sloc.as_deref() != Some(prev_bp_line.as_str())
             {
                 self.last_breakpoint_sloc = None;
             }
@@ -196,10 +114,10 @@ impl DebugContext for DapDebugContext {
             _ => false,
         };
         let breakpoint_hit = !is_under_the_same_bp_sloc
-            && self.breakpoints.iter().any(|bp| {
-                instr_string[..].starts_with(bp.as_str())
-                    || current_sloc.as_deref() == Some(bp.as_str())
-            });
+            && self
+                .breakpoints
+                .iter()
+                .any(|bp| current_sloc.as_deref() == Some(bp.as_str()));
 
         let should_take_input = match &mut self.current_op {
             DebuggerOp::Step => {
@@ -249,28 +167,89 @@ impl DebugContext for DapDebugContext {
             let bp_match = self
                 .breakpoints
                 .iter()
-                .find(|bp| {
-                    instr_string.starts_with(bp.as_str())
-                        || current_sloc.as_deref() == Some(bp.as_str())
-                })
+                .find(|bp| current_sloc.as_deref() == Some(bp.as_str()))
                 .cloned()
-                .unwrap_or(fq_function_name.clone());
+                .unwrap_or(function.name_as_pretty_string().clone());
             StopReason::Breakpoint(bp_match)
         } else {
             StopReason::Step
         };
 
-        self.apply_dap_command_queue(
+        let vm_stopped_state = build_vm_stopped_state(
             function,
             locals,
             pc,
+            instr,
+            function.name_as_pretty_string(),
             runtime_environment,
             interpreter,
-            &instr_string,
-            &fq_function_name,
-            stop_reason,
-            &current_sloc,
+            &self.moved_locals,
         );
+
+        if self
+            .event_tx
+            .send(DapEvent::Stopped {
+                reason: stop_reason,
+                vm_state: vm_stopped_state,
+            })
+            .is_err()
+        {
+            self.current_op = DebuggerOp::Continue;
+            return;
+        }
+
+        loop {
+            let cmd = match self.command_rx.recv() {
+                Ok(cmd) => cmd,
+                Err(_) => {
+                    self.current_op = DebuggerOp::Continue;
+                    return;
+                }
+            };
+            match cmd {
+                DapCommand::Continue => {
+                    self.current_op = DebuggerOp::Continue;
+                    break;
+                }
+                DapCommand::Step => {
+                    self.current_op = DebuggerOp::Step;
+                    break;
+                }
+                DapCommand::StepOver => {
+                    self.current_op = DebuggerOp::StepOverLine {
+                        stack_depth: interpreter.get_stack_depth(),
+                        start_source_loc: current_sloc.clone(),
+                    };
+                    break;
+                }
+                DapCommand::StepOut => {
+                    let stack_depth = interpreter.get_stack_depth();
+                    if stack_depth == 0 {
+                        self.current_op = DebuggerOp::Continue;
+                    } else {
+                        self.current_op = DebuggerOp::StepOut {
+                            target_stack_depth: stack_depth - 1,
+                        };
+                    }
+                    break;
+                }
+                DapCommand::SetBreakpoints(bps) => {
+                    self.breakpoints = bps.into_iter().collect();
+                }
+            }
+        }
+
+        // self.apply_dap_command_queue(
+        //     function,
+        //     locals,
+        //     pc,
+        //     runtime_environment,
+        //     interpreter,
+        //     &instr_string,
+        //     &fq_function_name,
+        //     stop_reason,
+        //     &current_sloc,
+        // );
     }
 
     fn capture_thread_state(&self) -> Box<dyn ThreadStateHandle> {
@@ -278,6 +257,41 @@ impl DebugContext for DapDebugContext {
             dap_handle: self.dap_handle(),
             source_locator: source_locator::get_source_locator(),
         })
+    }
+}
+
+impl DapDebugContext {
+    fn handle_potentially_moved_locals(
+        &mut self,
+        function: &LoadedFunction,
+        locals: &Locals,
+        instr: &Instruction,
+        runtime_environment: &RuntimeEnvironment,
+        interpreter: &dyn InterpreterDebugInterface,
+    ) {
+        match instr {
+            Instruction::MoveLoc(local_idx) => {
+                let local_idx = *local_idx as usize;
+                if let Some(local_ty) = function.local_tys().get(local_idx) {
+                    let type_resolver = LocatorTypeResolver::new(runtime_environment, interpreter);
+                    let dv = debug_value::serialize_local_value(
+                        locals,
+                        local_idx,
+                        local_ty,
+                        &type_resolver,
+                    );
+                    // we save locals only on specific `current_stack_depth`, and clear those on `Ret` later
+                    self.moved_locals
+                        .entry(interpreter.get_stack_depth())
+                        .or_default()
+                        .insert(local_idx, dv);
+                }
+            }
+            Instruction::Ret => {
+                self.moved_locals.remove(&interpreter.get_stack_depth());
+            }
+            _ => (),
+        }
     }
 }
 
@@ -337,8 +351,8 @@ fn build_vm_stopped_state(
     function: &LoadedFunction,
     locals: &Locals,
     pc: u16,
-    instr_string: &str,
-    function_name: &str,
+    instr: &Instruction,
+    fq_function_name: String,
     runtime_environment: &RuntimeEnvironment,
     interpreter: &dyn InterpreterDebugInterface,
     moved_locals: &HashMap<usize, HashMap<usize, DebugValue>>,
@@ -354,7 +368,7 @@ fn build_vm_stopped_state(
         .iter()
         .enumerate()
         .map(|(i, (module_id, func_def_idx, code_offset))| {
-            let frame_source_loc = module_id.as_ref().and_then(|mid| {
+            let frame_source_line = module_id.as_ref().and_then(|mid| {
                 source_locator::get_bytecode_source_location(mid, *func_def_idx, *code_offset)
             });
             let caller_depth = stack_depth - 1 - i;
@@ -381,7 +395,7 @@ fn build_vm_stopped_state(
             DapFrameInfo {
                 function_name: frame_fname,
                 pc: *code_offset,
-                source_location: frame_source_loc,
+                source_location: frame_source_line,
                 locals: frame_locals_infos,
             }
         })
@@ -397,9 +411,9 @@ fn build_vm_stopped_state(
     );
 
     VmStoppedState {
-        function_name: function_name.to_string(),
+        function_name: fq_function_name.to_string(),
         pc,
-        instruction: instr_string.to_string(),
+        instruction: format!("{:?}", instr),
         dap_stack_trace,
         dap_locals: local_infos,
         source_location,
