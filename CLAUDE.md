@@ -1,2 +1,2 @@
-If trying to run `git` command in any other local repo, i.e. `~/code/aptos-core`, run them with `git -C REPO_PATH`
-instead of `cd && git`.
+After finishing code changes, always verify by running `cargo check` first, then `cargo test` separately.
+This makes it easy to distinguish compilation slowness from test timeouts.

@@ -23,7 +23,7 @@ enum DebuggerOp {
         stack_depth: usize,
         start_source_loc: Option<String>,
     },
-    StepRemaining(usize),
+    Step,
     StepOut {
         target_stack_depth: usize,
     },
@@ -44,7 +44,7 @@ impl DapDebugContext {
         Self {
             event_tx: handle.event_tx,
             command_rx: handle.command_rx,
-            current_op: DebuggerOp::StepRemaining(1),
+            current_op: DebuggerOp::Step,
             breakpoints: BTreeSet::new(),
             moved_locals: HashMap::new(),
             last_breakpoint_sloc: None,
@@ -107,11 +107,11 @@ impl DapDebugContext {
                     self.current_op = DebuggerOp::Continue;
                     break;
                 }
-                DapCommand::Step(n) => {
-                    self.current_op = DebuggerOp::StepRemaining(n);
+                DapCommand::Step => {
+                    self.current_op = DebuggerOp::Step;
                     break;
                 }
-                DapCommand::StepOver(_) => {
+                DapCommand::StepOver => {
                     self.current_op = DebuggerOp::StepOverLine {
                         stack_depth: interpreter.get_stack_depth(),
                         start_source_loc: source_loc.clone(),
@@ -194,14 +194,9 @@ impl DebugContext for DapDebugContext {
             });
 
         let should_take_input = match &mut self.current_op {
-            DebuggerOp::StepRemaining(n) => {
-                if *n == 1 {
-                    self.current_op = DebuggerOp::Continue;
-                    true
-                } else {
-                    *n -= 1;
-                    false
-                }
+            DebuggerOp::Step => {
+                self.current_op = DebuggerOp::Continue;
+                true
             }
             DebuggerOp::StepOverLine {
                 stack_depth,

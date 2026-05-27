@@ -3,8 +3,8 @@ use crate::debugger::debug_value::DebugValue;
 #[derive(Debug)]
 pub enum DapCommand {
     Continue,
-    Step(usize),
-    StepOver(usize),
+    Step,
+    StepOver,
     StepOut,
     SetBreakpoints(Vec<String>),
 }
@@ -98,7 +98,7 @@ mod tests {
                 }
                 _ => panic!("expected Stopped event"),
             }
-            cmd_tx.send(DapCommand::Step(1)).unwrap();
+            cmd_tx.send(DapCommand::Step).unwrap();
 
             let evt = evt_rx.recv().unwrap();
             assert!(matches!(evt, DapEvent::Stopped { .. }));
@@ -133,7 +133,7 @@ mod tests {
             .unwrap();
 
         let cmd = cmd_rx.recv().unwrap();
-        assert!(matches!(cmd, DapCommand::Step(1)));
+        assert!(matches!(cmd, DapCommand::Step));
 
         evt_tx
             .send(DapEvent::Stopped {

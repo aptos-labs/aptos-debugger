@@ -388,7 +388,7 @@ impl<R: io::Read, W: io::Write> DapServer<R, W> {
 
     fn handle_next(&mut self, req: Request, _args: dap::requests::NextArguments) -> Result<()> {
         self.server.respond(req.success(ResponseBody::Next))?;
-        self.send_command_and_wait(DapCommand::StepOver(1))?;
+        self.send_command_and_wait(DapCommand::StepOver)?;
         Ok(())
     }
 
@@ -398,7 +398,7 @@ impl<R: io::Read, W: io::Write> DapServer<R, W> {
         _args: dap::requests::StepInArguments,
     ) -> Result<()> {
         self.server.respond(req.success(ResponseBody::StepIn))?;
-        self.send_command_and_wait(DapCommand::Step(1))?;
+        self.send_command_and_wait(DapCommand::Step)?;
         Ok(())
     }
 
