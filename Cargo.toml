@@ -8,29 +8,29 @@ edition = "2024"
 
 [dependencies]
 anyhow = "1.0.98"
-aptos-framework = { path = "../aptos-core/aptos-move/framework" }
-aptos-gas-schedule = { path = "../aptos-core/aptos-move/aptos-gas-schedule" }
-aptos-move-cli = { path = "../aptos-core/aptos-move/cli", features = ["testing"] }
-aptos-move-debugger = { path = "../aptos-core/aptos-move/aptos-debugger" }
-aptos-resource-viewer = { path = "../aptos-core/aptos-move/aptos-resource-viewer" }
-aptos-rest-client = { path = "../aptos-core/crates/aptos-rest-client" }
-aptos-types = { path = "../aptos-core/types" }
-aptos-validator-interface = { path = "../aptos-core/aptos-move/aptos-validator-interface" }
-aptos-vm-environment = { path = "../aptos-core/aptos-move/aptos-vm-environment" }
+aptos-framework = { git = "https://github.com/aptos-labs/aptos-core.git", branch = "debug-value-extracted" }
+aptos-gas-schedule = { git = "https://github.com/aptos-labs/aptos-core.git", branch = "debug-value-extracted" }
+aptos-move-cli = { git = "https://github.com/aptos-labs/aptos-core.git", branch = "debug-value-extracted", features = ["testing"] }
+aptos-move-debugger = { git = "https://github.com/aptos-labs/aptos-core.git", branch = "debug-value-extracted" }
+aptos-resource-viewer = { git = "https://github.com/aptos-labs/aptos-core.git", branch = "debug-value-extracted" }
+aptos-rest-client = { git = "https://github.com/aptos-labs/aptos-core.git", branch = "debug-value-extracted" }
+aptos-types = { git = "https://github.com/aptos-labs/aptos-core.git", branch = "debug-value-extracted" }
+aptos-validator-interface = { git = "https://github.com/aptos-labs/aptos-core.git", branch = "debug-value-extracted" }
+aptos-vm-environment = { git = "https://github.com/aptos-labs/aptos-core.git", branch = "debug-value-extracted" }
 clap = { version = "4.3.9", features = ["derive"] }
 crossbeam-channel = "0.5.4"
 dap = "0.4.1-alpha1"
 hex = "0.4.3"
-legacy-move-compiler = { path = "../aptos-core/third_party/move/move-compiler-v2/legacy-move-compiler" }
-move-binary-format = { path = "../aptos-core/third_party/move/move-binary-format" }
-move-bytecode-utils = { path = "../aptos-core/third_party/move/tools/move-bytecode-utils" }
-move-core-types = { path = "../aptos-core/third_party/move/move-core/types" }
-move-model = { path = "../aptos-core/third_party/move/move-model" }
-move-package = { path = "../aptos-core/third_party/move/tools/move-package" }
-move-resource-viewer = { path = "../aptos-core/third_party/move/tools/move-resource-viewer" }
-move-unit-test = { path = "../aptos-core/third_party/move/tools/move-unit-test" }
-move-vm-runtime = { path = "../aptos-core/third_party/move/move-vm/runtime", features = ["debugger"] }
-move-vm-types = { path = "../aptos-core/third_party/move/move-vm/types", features = ["debugger"] }
+legacy-move-compiler = { git = "https://github.com/aptos-labs/aptos-core.git", branch = "debug-value-extracted" }
+move-binary-format = { git = "https://github.com/aptos-labs/aptos-core.git", branch = "debug-value-extracted" }
+move-bytecode-utils = { git = "https://github.com/aptos-labs/aptos-core.git", branch = "debug-value-extracted" }
+move-core-types = { git = "https://github.com/aptos-labs/aptos-core.git", branch = "debug-value-extracted" }
+move-model = { git = "https://github.com/aptos-labs/aptos-core.git", branch = "debug-value-extracted" }
+move-package = { git = "https://github.com/aptos-labs/aptos-core.git", branch = "debug-value-extracted" }
+move-resource-viewer = { git = "https://github.com/aptos-labs/aptos-core.git", branch = "debug-value-extracted" }
+move-unit-test = { git = "https://github.com/aptos-labs/aptos-core.git", branch = "debug-value-extracted" }
+move-vm-runtime = { git = "https://github.com/aptos-labs/aptos-core.git", branch = "debug-value-extracted", features = ["debugger"] }
+move-vm-types = { git = "https://github.com/aptos-labs/aptos-core.git", branch = "debug-value-extracted", features = ["debugger"] }
 serde_json = "1.0.81"
 tokio = { version = "1.35.1", features = ["full"] }
 url = "2.4.0"
@@ -38,7 +38,7 @@ url = "2.4.0"
 [dev-dependencies]
 expect-test = "1.4.1"
 indexmap = "2.7.0"
-move-vm-types = { path = "../aptos-core/third_party/move/move-vm/types", features = ["testing"] }
+move-vm-types = { git = "https://github.com/aptos-labs/aptos-core.git", branch = "debug-value-extracted", features = ["testing"] }
 regex = "1.9.3"
 tempfile = "3.3.0"
 triomphe = "0.1.14"
