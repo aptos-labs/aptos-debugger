@@ -21,14 +21,14 @@ use std::{
 #[derive(Debug)]
 enum DebuggerOp {
     StepOverLine {
-        stack_depth: usize,
-        start_source_loc: Option<String>,
+        line_stack_depth: usize,
+        line_sloc: Option<String>,
     },
     Step,
     StepOut {
         target_stack_depth: usize,
     },
-    Continue,
+    RunUntilBreakpoint,
 }
 
 pub struct DapDebugContext {
@@ -37,7 +37,8 @@ pub struct DapDebugContext {
     current_op: DebuggerOp,
     breakpoints: BTreeSet<String>,
     moved_locals: HashMap<usize, HashMap<usize, DebugValue>>,
-    last_breakpoint_sloc: Option<(String, usize)>,
+    // (loc, stack depth)
+    last_breakpoint_hit: Option<(String, usize)>,
 }
 
 impl DapDebugContext {
@@ -48,7 +49,7 @@ impl DapDebugContext {
             current_op: DebuggerOp::Step,
             breakpoints: BTreeSet::new(),
             moved_locals: HashMap::new(),
-            last_breakpoint_sloc: None,
+            last_breakpoint_hit: None,
         }
     }
 
@@ -95,84 +96,53 @@ impl DebugContext for DapDebugContext {
             interpreter,
         );
 
-        let current_stack_depth = interpreter.get_stack_depth();
-        let current_sloc = function.module_id().and_then(|mid| {
+        let current_line = function.module_id().and_then(|mid| {
             source_locator::get_bytecode_source_location(mid, function.index(), pc)
         });
+        let current_stack_depth = interpreter.get_stack_depth();
 
-        if let Some((ref prev_bp_line, prev_bp_stack_depth)) = self.last_breakpoint_sloc {
-            if current_stack_depth <= prev_bp_stack_depth
-                && current_sloc.as_deref() != Some(prev_bp_line.as_str())
+        // Suppress re-triggering the same breakpoint on consecutive bytecode instructions
+        // that map to the same source line. Clears `last_breakpoint_loc` once we've moved
+        // past it (different line at same/shallower depth), re-enabling it for future hits.
+        let bp_suppressed = match &self.last_breakpoint_hit {
+            // deeper in the stack — don't clear, don't suppress (i.e. recursion)
+            Some((_, last_bp_depth)) if current_stack_depth > *last_bp_depth => false,
+            // on the same bp line, suppress it if we're on the same depth
+            Some((last_bp_line, last_bp_depth))
+                if current_line.as_deref() == Some(last_bp_line.as_str()) =>
             {
-                self.last_breakpoint_sloc = None;
+                current_stack_depth == *last_bp_depth
             }
+            // moved to a different line at the acceptable stack depth, so bp shouldn't be suppressed
+            // clear it for later usage too (i.e. in loops)
+            Some(_) => {
+                self.last_breakpoint_hit = None;
+                false
+            }
+            None => false,
+        };
+        let breakpoint_hit = (!bp_suppressed)
+            .then(|| {
+                self.breakpoints
+                    .iter()
+                    .find(|bp| current_line.as_deref() == Some(bp.as_str()))
+                    .cloned()
+            })
+            .flatten();
+        if let Some(breakpoint_hit) = breakpoint_hit.clone() {
+            self.last_breakpoint_hit = Some((breakpoint_hit, current_stack_depth));
         }
-        let is_under_the_same_bp_sloc = match (&current_sloc, &self.last_breakpoint_sloc) {
-            (Some(loc), Some((prev_bp_sloc, prev_bp_depth))) => {
-                loc == prev_bp_sloc && current_stack_depth == *prev_bp_depth
-            }
-            _ => false,
-        };
-        let breakpoint_hit = !is_under_the_same_bp_sloc
-            && self
-                .breakpoints
-                .iter()
-                .any(|bp| current_sloc.as_deref() == Some(bp.as_str()));
 
-        let should_take_input = match &mut self.current_op {
-            DebuggerOp::Step => {
-                self.current_op = DebuggerOp::Continue;
-                true
-            }
-            DebuggerOp::StepOverLine {
-                stack_depth,
-                start_source_loc,
-            } => {
-                let current_depth = interpreter.get_stack_depth();
-                if *stack_depth >= current_depth {
-                    let line_changed = match (&current_sloc, &*start_source_loc) {
-                        (Some(cur), Some(start)) => cur != start,
-                        (Some(_), None) => true,
-                        _ => false,
-                    };
-                    if line_changed {
-                        self.current_op = DebuggerOp::Continue;
-                        true
-                    } else {
-                        false
-                    }
-                } else {
-                    false
-                }
-            }
-            DebuggerOp::StepOut { target_stack_depth } => {
-                if *target_stack_depth == interpreter.get_stack_depth() {
-                    self.current_op = DebuggerOp::Continue;
-                    true
-                } else {
-                    false
-                }
-            }
-            DebuggerOp::Continue => false,
-        };
+        let should_stop_at_current_line =
+            self.should_stop_at_current_line(interpreter, current_line.clone());
 
-        if !should_take_input && !breakpoint_hit {
+        if !should_stop_at_current_line && breakpoint_hit.is_none() {
             return;
         }
 
-        let stop_reason = if breakpoint_hit {
-            self.last_breakpoint_sloc = current_sloc
-                .as_ref()
-                .map(|loc| (loc.clone(), current_stack_depth));
-            let bp_match = self
-                .breakpoints
-                .iter()
-                .find(|bp| current_sloc.as_deref() == Some(bp.as_str()))
-                .cloned()
-                .unwrap_or(function.name_as_pretty_string().clone());
-            StopReason::Breakpoint(bp_match)
-        } else {
-            StopReason::Step
+        let stop_reason = match breakpoint_hit {
+            Some(breakpoint_hit) => StopReason::Breakpoint(breakpoint_hit),
+            None => StopReason::Step,
         };
 
         let vm_stopped_state = build_vm_stopped_state(
@@ -194,7 +164,7 @@ impl DebugContext for DapDebugContext {
             })
             .is_err()
         {
-            self.current_op = DebuggerOp::Continue;
+            self.current_op = DebuggerOp::RunUntilBreakpoint;
             return;
         }
 
@@ -202,13 +172,13 @@ impl DebugContext for DapDebugContext {
             let cmd = match self.command_rx.recv() {
                 Ok(cmd) => cmd,
                 Err(_) => {
-                    self.current_op = DebuggerOp::Continue;
+                    self.current_op = DebuggerOp::RunUntilBreakpoint;
                     return;
                 }
             };
             match cmd {
                 DapCommand::Continue => {
-                    self.current_op = DebuggerOp::Continue;
+                    self.current_op = DebuggerOp::RunUntilBreakpoint;
                     break;
                 }
                 DapCommand::Step => {
@@ -217,15 +187,15 @@ impl DebugContext for DapDebugContext {
                 }
                 DapCommand::StepOver => {
                     self.current_op = DebuggerOp::StepOverLine {
-                        stack_depth: interpreter.get_stack_depth(),
-                        start_source_loc: current_sloc.clone(),
+                        line_stack_depth: current_stack_depth,
+                        line_sloc: current_line.clone(),
                     };
                     break;
                 }
                 DapCommand::StepOut => {
-                    let stack_depth = interpreter.get_stack_depth();
+                    let stack_depth = current_stack_depth;
                     if stack_depth == 0 {
-                        self.current_op = DebuggerOp::Continue;
+                        self.current_op = DebuggerOp::RunUntilBreakpoint;
                     } else {
                         self.current_op = DebuggerOp::StepOut {
                             target_stack_depth: stack_depth - 1,
@@ -238,18 +208,6 @@ impl DebugContext for DapDebugContext {
                 }
             }
         }
-
-        // self.apply_dap_command_queue(
-        //     function,
-        //     locals,
-        //     pc,
-        //     runtime_environment,
-        //     interpreter,
-        //     &instr_string,
-        //     &fq_function_name,
-        //     stop_reason,
-        //     &current_sloc,
-        // );
     }
 
     fn capture_thread_state(&self) -> Box<dyn ThreadStateHandle> {
@@ -292,6 +250,44 @@ impl DapDebugContext {
             }
             _ => (),
         }
+    }
+
+    fn should_stop_at_current_line(
+        &mut self,
+        interpreter: &dyn InterpreterDebugInterface,
+        current_source_line: Option<String>,
+    ) -> bool {
+        let current_stack_depth = interpreter.get_stack_depth();
+        let should_stop_after_op = match &self.current_op {
+            DebuggerOp::Step => true,
+            DebuggerOp::StepOverLine {
+                line_stack_depth,
+                line_sloc,
+            } => {
+                if *line_stack_depth >= current_stack_depth {
+                    let line_changed = match (&current_source_line, &*line_sloc) {
+                        (Some(cur), Some(start)) => cur != start,
+                        (Some(_), None) => true,
+                        _ => false,
+                    };
+                    if line_changed { true } else { false }
+                } else {
+                    false
+                }
+            }
+            DebuggerOp::StepOut { target_stack_depth } => {
+                if *target_stack_depth == interpreter.get_stack_depth() {
+                    true
+                } else {
+                    false
+                }
+            }
+            DebuggerOp::RunUntilBreakpoint => false,
+        };
+        if should_stop_after_op {
+            self.current_op = DebuggerOp::RunUntilBreakpoint;
+        }
+        should_stop_after_op
     }
 }
 
