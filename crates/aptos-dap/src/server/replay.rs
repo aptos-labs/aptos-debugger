@@ -3,23 +3,17 @@ use anyhow::bail;
 use aptos_move_cli::source_locator::AptosSourceLocator;
 use aptos_move_debugger::aptos_debugger::AptosDebugger;
 use aptos_rest_client::{AptosBaseUrl, Client};
-use aptos_types::{
-    state_store::{StateView, state_key::StateKey},
-    transaction::{
-        PersistedAuxiliaryInfo, SignedTransaction, Transaction, TransactionInfo, TransactionPayload,
-    },
+use aptos_resource_viewer::module_view::CachedModuleView;
+use aptos_types::transaction::{
+    PersistedAuxiliaryInfo, SignedTransaction, Transaction, TransactionInfo, TransactionPayload,
 };
 use aptos_validator_interface::LocalModuleOverrides;
 use dap::types::Variable;
-use move_binary_format::CompiledModule;
-use move_bytecode_utils::compiled_module_viewer::CompiledModuleView;
-use move_core_types::language_storage::ModuleId;
 use move_resource_viewer::MoveValueAnnotator;
 use move_vm_debugger::{DapDebugContext, DapEvent, DebugValue, create_dap_channels};
 use move_vm_runtime::{source_locator, tracing};
 use std::{
-    cell::RefCell,
-    collections::{BTreeMap, HashMap},
+    collections::BTreeMap,
     io,
     path::PathBuf,
     sync::Arc,
@@ -300,33 +294,6 @@ fn transaction_info_variables_static(txn_session: &ReplayTransactionSession) -> 
     ]
 }
 
-struct StateViewModuleViewer<S> {
-    state_view: S,
-    cache: RefCell<HashMap<ModuleId, Arc<CompiledModule>>>,
-}
-
-impl<S: StateView> CompiledModuleView for StateViewModuleViewer<S> {
-    type Item = Arc<CompiledModule>;
-
-    fn view_compiled_module(&self, module_id: &ModuleId) -> anyhow::Result<Option<Self::Item>> {
-        if let Some(cached) = self.cache.borrow().get(module_id) {
-            return Ok(Some(cached.clone()));
-        }
-        let state_key = StateKey::module_id(module_id);
-        match self.state_view.get_state_value_bytes(&state_key)? {
-            Some(bytes) => {
-                let module = CompiledModule::deserialize(&bytes)
-                    .map_err(|e| anyhow::anyhow!("deserialize {}: {:?}", module_id, e))?;
-                let module = Arc::new(module);
-                self.cache
-                    .borrow_mut()
-                    .insert(module_id.clone(), module.clone());
-                Ok(Some(module))
-            }
-            None => Ok(None),
-        }
-    }
-}
 
 fn annotated_to_debug_value(v: &move_resource_viewer::AnnotatedMoveValue) -> DebugValue {
     use move_resource_viewer::AnnotatedMoveValue;
@@ -410,10 +377,7 @@ fn decode_entry_function_args(
     }
 
     let state_view = debugger.state_view_at_version(txn_id);
-    let module_viewer = StateViewModuleViewer {
-        state_view,
-        cache: RefCell::new(HashMap::new()),
-    };
+    let module_viewer = CachedModuleView::new(state_view);
     let annotator = MoveValueAnnotator::new(module_viewer);
     let decoded =
         annotator.view_function_arguments(entry_fn.module(), entry_fn.function(), entry_fn.ty_args(), entry_fn.args());

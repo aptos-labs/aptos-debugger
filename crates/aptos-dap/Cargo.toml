@@ -12,6 +12,7 @@ aptos-framework = { workspace = true }
 aptos-gas-schedule = { workspace = true }
 aptos-move-cli = { workspace = true, features = ["testing"] }
 aptos-move-debugger = { workspace = true }
+aptos-resource-viewer = { workspace = true }
 aptos-rest-client = { workspace = true }
 aptos-types = { workspace = true }
 aptos-validator-interface = { workspace = true }

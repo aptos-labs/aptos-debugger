@@ -275,7 +275,6 @@ module 0x42::test {
 }
 
 #[test]
-#[ignore] // nested struct field names not yet resolved
 fn test_nested_struct_fields() {
     // language=Move
     let pkg = build_test_package(
@@ -307,7 +306,14 @@ module 0x42::test {
     let mut t = DapTestServer::start(mode);
     t.initialize_and_launch_test(&pkg);
 
-    t.assert_frame_variables(0, expect![[r#""#]]);
+    t.assert_frame_variables(0, expect![[r#"
+[
+  {
+    "name": "o",
+    "value": "Outer { inner: Inner { x: 100, y: true }, tag: 7 }",
+    "variablesReference": 100000
+  }
+]"#]]);
 }
 
 #[test]

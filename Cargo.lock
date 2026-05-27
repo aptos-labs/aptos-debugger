@@ -706,6 +706,7 @@ dependencies = [
  "aptos-gas-schedule",
  "aptos-move-cli",
  "aptos-move-debugger",
+ "aptos-resource-viewer",
  "aptos-rest-client",
  "aptos-types",
  "aptos-validator-interface",

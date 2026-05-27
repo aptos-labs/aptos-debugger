@@ -14,6 +14,7 @@ aptos-framework = { path = "../aptos-core/aptos-move/framework" }
 aptos-gas-schedule = { path = "../aptos-core/aptos-move/aptos-gas-schedule" }
 aptos-move-cli = { path = "../aptos-core/aptos-move/cli" }
 aptos-move-debugger = { path = "../aptos-core/aptos-move/aptos-debugger" }
+aptos-resource-viewer = { path = "../aptos-core/aptos-move/aptos-resource-viewer" }
 aptos-rest-client = { path = "../aptos-core/crates/aptos-rest-client" }
 aptos-types = { path = "../aptos-core/types" }
 aptos-validator-interface = { path = "../aptos-core/aptos-move/aptos-validator-interface" }
