@@ -41,40 +41,6 @@ pub struct DapDebugContext {
     last_breakpoint_hit: Option<(String, usize)>,
 }
 
-impl DapDebugContext {
-    pub fn new(handle: DapDebugHandle) -> Self {
-        Self {
-            event_tx: handle.event_tx,
-            command_rx: handle.command_rx,
-            next_cmd_op: DebuggerOp::Step,
-            breakpoints: BTreeSet::new(),
-            moved_locals: HashMap::new(),
-            last_breakpoint_hit: None,
-        }
-    }
-
-    pub fn dap_handle(&self) -> DapDebugHandle {
-        DapDebugHandle {
-            event_tx: self.event_tx.clone(),
-            command_rx: self.command_rx.clone(),
-        }
-    }
-
-    // fn apply_dap_command_queue(
-    //     &mut self,
-    //     function: &LoadedFunction,
-    //     locals: &Locals,
-    //     pc: u16,
-    //     runtime_environment: &RuntimeEnvironment,
-    //     interpreter: &dyn InterpreterDebugInterface,
-    //     instr_string: &str,
-    //     fq_function_name: &str,
-    //     stop_reason: StopReason,
-    //     source_loc: &Option<String>,
-    // ) {
-    // }
-}
-
 impl DebugContext for DapDebugContext {
     /// Executed before each bytecode instruction by the VM.
     fn debug_loop(
@@ -86,8 +52,6 @@ impl DebugContext for DapDebugContext {
         runtime_environment: &RuntimeEnvironment,
         interpreter: &dyn InterpreterDebugInterface,
     ) {
-        // After each variable is "moved" throughout the execution, it disappears from Locals.
-        // We still want to be able to inspect it from the Variables, so we save all of those for later.
         self.handle_potentially_moved_locals(
             function,
             locals,
@@ -101,40 +65,11 @@ impl DebugContext for DapDebugContext {
         });
         let current_stack_depth = interpreter.get_stack_depth();
 
-        // Suppress re-triggering the same breakpoint on consecutive bytecode instructions
-        // that map to the same source line. Clears `last_breakpoint_loc` once we've moved
-        // past it (different line at same/shallower depth), re-enabling it for future hits.
-        let bp_suppressed = match &self.last_breakpoint_hit {
-            // deeper in the stack — don't clear, don't suppress (i.e. recursion)
-            Some((_, last_bp_depth)) if current_stack_depth > *last_bp_depth => false,
-            // on the same bp line, suppress it if we're on the same depth
-            Some((last_bp_line, last_bp_depth))
-                if current_line.as_deref() == Some(last_bp_line.as_str()) =>
-            {
-                current_stack_depth == *last_bp_depth
-            }
-            // moved to a different line at the acceptable stack depth, so bp shouldn't be suppressed
-            // clear it for later usage too (i.e. in loops)
-            Some(_) => {
-                self.last_breakpoint_hit = None;
-                false
-            }
-            None => false,
-        };
-        let breakpoint_hit = (!bp_suppressed)
-            .then(|| {
-                self.breakpoints
-                    .iter()
-                    .find(|bp| current_line.as_deref() == Some(bp.as_str()))
-                    .cloned()
-            })
-            .flatten();
-        if let Some(breakpoint_hit) = breakpoint_hit.clone() {
-            self.last_breakpoint_hit = Some((breakpoint_hit, current_stack_depth));
-        }
+        // should be checked before `self.next_cmd_op` to not stop at the line twice
+        let breakpoint_hit =
+            self.check_if_breakpoint_got_hit(current_stack_depth, current_line.clone());
 
-        let should_stop_at_current_line =
-            self.should_stop_at_current_line(interpreter, current_line.clone());
+        let should_stop_at_current_line = self.apply_next_cmd_op(interpreter, current_line.clone());
 
         if !should_stop_at_current_line && breakpoint_hit.is_none() {
             return;
@@ -143,10 +78,10 @@ impl DebugContext for DapDebugContext {
         let vm_stopped_state = build_vm_stopped_state(
             function,
             locals,
-            pc,
             instr,
             runtime_environment,
             interpreter,
+            current_line.clone(),
             &self.moved_locals,
         );
         let stop_reason = match breakpoint_hit {
@@ -187,13 +122,29 @@ impl DebugContext for DapDebugContext {
 
     fn capture_thread_state(&self) -> Box<dyn ThreadStateHandle> {
         Box::new(DapThreadState {
-            dap_handle: self.dap_handle(),
+            dap_handle: DapDebugHandle {
+                event_tx: self.event_tx.clone(),
+                command_rx: self.command_rx.clone(),
+            },
             source_locator: source_locator::get_source_locator(),
         })
     }
 }
 
 impl DapDebugContext {
+    pub fn new(handle: DapDebugHandle) -> Self {
+        Self {
+            event_tx: handle.event_tx,
+            command_rx: handle.command_rx,
+            next_cmd_op: DebuggerOp::Step,
+            breakpoints: BTreeSet::new(),
+            moved_locals: HashMap::new(),
+            last_breakpoint_hit: None,
+        }
+    }
+
+    /// After each variable is "moved" from scope throughout the execution, it disappears from Locals.
+    /// We still want to be able to inspect it in the Variables view, so we save all of those for later in `self.moved_locals`.
     fn handle_potentially_moved_locals(
         &mut self,
         function: &LoadedFunction,
@@ -227,7 +178,49 @@ impl DapDebugContext {
         }
     }
 
-    fn should_stop_at_current_line(
+    fn check_if_breakpoint_got_hit(
+        &mut self,
+        current_stack_depth: usize,
+        current_line: Option<String>,
+    ) -> Option<String> {
+        // Suppress re-triggering the same breakpoint on consecutive bytecode instructions
+        // that map to the same source line. Clears `last_breakpoint_loc` once we've moved
+        // past it (different line at same/shallower depth), re-enabling it for future hits.
+        let bp_suppressed = match &self.last_breakpoint_hit {
+            // deeper in the stack — don't clear, don't suppress
+            Some((_, last_bp_depth)) if current_stack_depth > *last_bp_depth => false,
+            // on the same bp line, suppress it if we're on the same depth
+            Some((last_bp_line, last_bp_depth))
+                if current_line.as_deref() == Some(last_bp_line.as_str()) =>
+            {
+                current_stack_depth == *last_bp_depth
+            }
+            // moved to a different line at the acceptable stack depth, so bp shouldn't be suppressed.
+            // clear it for later usage too (i.e. in loops)
+            Some(_) => {
+                self.last_breakpoint_hit = None;
+                false
+            }
+            None => false,
+        };
+        if bp_suppressed {
+            return None;
+        }
+
+        let breakpoint_hit = self
+            .breakpoints
+            .iter()
+            .find(|bp| current_line.as_deref() == Some(bp.as_str()))
+            .cloned();
+
+        if let Some(breakpoint_hit) = breakpoint_hit.clone() {
+            self.last_breakpoint_hit = Some((breakpoint_hit, current_stack_depth));
+        }
+
+        breakpoint_hit
+    }
+
+    fn apply_next_cmd_op(
         &mut self,
         interpreter: &dyn InterpreterDebugInterface,
         current_source_line: Option<String>,
@@ -245,7 +238,7 @@ impl DapDebugContext {
                         (Some(_), None) => true,
                         _ => false,
                     };
-                    if line_changed { true } else { false }
+                    line_changed
                 } else {
                     false
                 }
@@ -347,16 +340,12 @@ fn build_dap_local_infos(
 fn build_vm_stopped_state(
     function: &LoadedFunction,
     locals: &Locals,
-    pc: u16,
     instr: &Instruction,
     runtime_environment: &RuntimeEnvironment,
     interpreter: &dyn InterpreterDebugInterface,
+    current_line: Option<String>,
     moved_locals: &HashMap<usize, HashMap<usize, DebugValue>>,
 ) -> VmStoppedState {
-    let source_location = function.module_id().and_then(|module_id| {
-        source_locator::get_bytecode_source_location(module_id, function.index(), pc)
-    });
-
     let stack_depth = interpreter.get_stack_depth();
     let dap_stack_trace = interpreter
         .get_stack_frames(usize::MAX)
@@ -408,10 +397,9 @@ fn build_vm_stopped_state(
 
     VmStoppedState {
         function_name: function.name_as_pretty_string(),
-        pc,
         instruction: format!("{:?}", instr),
         dap_stack_trace,
         dap_locals: local_infos,
-        source_location,
+        source_location: current_line,
     }
 }
