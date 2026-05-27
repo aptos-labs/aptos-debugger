@@ -41,6 +41,21 @@ pub struct DapDebugContext {
     last_breakpoint_hit: Option<(String, usize)>,
 }
 
+struct DapThreadState {
+    dap_handle: DapDebugHandle,
+    source_locator: Option<Arc<dyn source_locator::SourceLocator>>,
+}
+
+impl ThreadStateHandle for DapThreadState {
+    fn install_on_thread(&self) {
+        tracing::set_debugging_enabled(true);
+        if let Some(loc) = &self.source_locator {
+            source_locator::set_source_locator(loc.clone());
+        }
+        tracing::set_debug_context(Box::new(DapDebugContext::new(self.dap_handle.clone())));
+    }
+}
+
 impl DebugContext for DapDebugContext {
     /// Executed before each bytecode instruction by the VM.
     fn debug_loop(
@@ -285,21 +300,6 @@ fn parse_cmd_op(
     }
 }
 
-struct DapThreadState {
-    dap_handle: DapDebugHandle,
-    source_locator: Option<Arc<dyn source_locator::SourceLocator>>,
-}
-
-impl ThreadStateHandle for DapThreadState {
-    fn install_on_thread(&self) {
-        tracing::set_debugging_enabled(true);
-        if let Some(loc) = &self.source_locator {
-            source_locator::set_source_locator(loc.clone());
-        }
-        tracing::set_debug_context(Box::new(DapDebugContext::new(self.dap_handle.clone())));
-    }
-}
-
 fn build_dap_local_infos(
     function: &LoadedFunction,
     locals: &Locals,
@@ -307,25 +307,24 @@ fn build_dap_local_infos(
     interpreter: &dyn InterpreterDebugInterface,
     moved_locals: Option<&HashMap<usize, DebugValue>>,
 ) -> Vec<DapLocalInfo> {
-    if function.local_tys().is_empty() {
-        return vec![];
-    }
     let local_infos = resolver::build_local_infos(function);
-    let name_resolver = LocatorTypeResolver::new(runtime_environment, interpreter);
+    let type_resolver = LocatorTypeResolver::new(runtime_environment, interpreter);
 
     local_infos
         .into_iter()
         .map(|local_info| {
-            let ty = &function.local_tys()[local_info.index];
-            let debug_value =
-                debug_value::serialize_local_value(locals, local_info.index, ty, &name_resolver);
-            let debug_value = if matches!(&debug_value, DebugValue::Invalid) {
-                moved_locals
+            let debug_value = debug_value::serialize_local_value(
+                locals,
+                local_info.index,
+                &local_info.ty,
+                &type_resolver,
+            );
+            let debug_value = match debug_value {
+                DebugValue::Invalid => moved_locals
                     .and_then(|m| m.get(&local_info.index))
                     .cloned()
-                    .unwrap_or(debug_value)
-            } else {
-                debug_value
+                    .unwrap_or(debug_value),
+                _ => debug_value,
             };
             DapLocalInfo {
                 index: local_info.index,
@@ -379,7 +378,6 @@ fn build_vm_stopped_state(
             };
             DapFrameInfo {
                 function_name: frame_fname,
-                pc: *code_offset,
                 source_location: frame_source_line,
                 locals: frame_locals_infos,
             }

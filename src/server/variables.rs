@@ -1,6 +1,6 @@
+use crate::debugger::{DebugValue, VmStoppedState};
 use crate::proto;
 use dap::types::Variable;
-use crate::debugger::{DebugValue, VmStoppedState};
 
 const FRAME_LOCALS_OFFSET: i64 = 1000;
 const EXPANDABLE_VARS_OFFSET: i64 = 100_000;

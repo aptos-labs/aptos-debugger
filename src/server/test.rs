@@ -1,3 +1,4 @@
+use crate::debugger::{DapDebugContext, DapEvent, create_dap_channels};
 use crate::server::DapServer;
 use aptos_framework::extended_checks;
 use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters};
@@ -6,7 +7,6 @@ use aptos_move_cli::{
 };
 use aptos_types::on_chain_config::aptos_test_feature_flags_genesis;
 use aptos_vm_environment::prod_configs::set_debugging_enabled;
-use crate::debugger::{DapDebugContext, DapEvent, create_dap_channels};
 use move_vm_runtime::{source_locator, tracing};
 use std::{io, path::PathBuf, sync::Arc, thread};
 

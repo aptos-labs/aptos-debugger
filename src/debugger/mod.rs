@@ -5,8 +5,8 @@ pub mod resolver;
 
 pub use dap_context::DapDebugContext;
 pub use dap_types::{
-    create_dap_channels, DapCommand, DapDebugHandle, DapEvent, DapFrameInfo, DapLocalInfo, StopReason,
-    VmStoppedState,
+    DapCommand, DapDebugHandle, DapEvent, DapFrameInfo, DapLocalInfo, StopReason, VmStoppedState,
+    create_dap_channels,
 };
 pub use debug_value::{AdtInfo, DebugValue, FieldInfo, TypeResolver};
 pub use resolver::LocatorTypeResolver;

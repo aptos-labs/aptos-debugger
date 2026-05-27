@@ -1,8 +1,8 @@
+use crate::debugger::StopReason;
 use dap::{
     events::{Event, OutputEventBody, StoppedEventBody},
     types::{OutputEventCategory, StoppedEventReason, Variable},
 };
-use crate::debugger::StopReason;
 
 pub(crate) fn stop_reason_to_dap(reason: &StopReason) -> StoppedEventReason {
     match reason {

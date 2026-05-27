@@ -19,7 +19,6 @@ pub enum StopReason {
 #[derive(Debug)]
 pub struct DapFrameInfo {
     pub function_name: String,
-    pub pc: u16,
     pub source_location: Option<String>,
     pub locals: Vec<DapLocalInfo>,
 }
@@ -114,7 +113,6 @@ mod tests {
                     instruction: "Call(0)".to_string(),
                     dap_stack_trace: vec![DapFrameInfo {
                         function_name: "test_module::test_fn".to_string(),
-                        pc: 0,
                         source_location: Some("test.move:10".to_string()),
                         locals: vec![],
                     }],

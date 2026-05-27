@@ -1,4 +1,4 @@
-use aptos_dap::server::{variables::frame_locals_ref_id, DapServer, RunCommand};
+use aptos_dap::server::{DapServer, RunCommand, variables::frame_locals_ref_id};
 use indexmap::IndexMap;
 use std::{
     collections::BTreeMap,

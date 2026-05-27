@@ -1,3 +1,4 @@
+use crate::debugger::{DapDebugContext, DapEvent, DebugValue, create_dap_channels};
 use crate::{proto, server::DapServer};
 use anyhow::bail;
 use aptos_move_cli::source_locator::AptosSourceLocator;
@@ -10,7 +11,6 @@ use aptos_types::transaction::{
 use aptos_validator_interface::LocalModuleOverrides;
 use dap::types::Variable;
 use move_resource_viewer::MoveValueAnnotator;
-use crate::debugger::{DapDebugContext, DapEvent, DebugValue, create_dap_channels};
 use move_vm_runtime::{source_locator, tracing};
 use std::{collections::BTreeMap, io, path::PathBuf, sync::Arc, thread};
 use url::Url;
