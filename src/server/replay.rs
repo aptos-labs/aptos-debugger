@@ -10,7 +10,7 @@ use aptos_types::transaction::{
 use aptos_validator_interface::LocalModuleOverrides;
 use dap::types::Variable;
 use move_resource_viewer::MoveValueAnnotator;
-use move_vm_debugger::{DapDebugContext, DapEvent, DebugValue, create_dap_channels};
+use crate::debugger::{DapDebugContext, DapEvent, DebugValue, create_dap_channels};
 use move_vm_runtime::{source_locator, tracing};
 use std::{collections::BTreeMap, io, path::PathBuf, sync::Arc, thread};
 use url::Url;

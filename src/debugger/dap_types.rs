@@ -1,4 +1,4 @@
-use crate::debug_value::DebugValue;
+use crate::debugger::debug_value::DebugValue;
 
 #[derive(Debug)]
 pub enum DapCommand {

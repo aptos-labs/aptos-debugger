@@ -2,7 +2,7 @@ use dap::{
     events::{Event, StoppedEventBody},
     types::{StoppedEventReason, Variable},
 };
-use move_vm_debugger::StopReason;
+use crate::debugger::StopReason;
 
 pub(crate) fn stop_reason_to_dap(reason: &StopReason) -> StoppedEventReason {
     match reason {

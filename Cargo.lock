@@ -725,13 +725,13 @@ dependencies = [
  "move-package",
  "move-resource-viewer",
  "move-unit-test",
- "move-vm-debugger",
  "move-vm-runtime",
  "move-vm-types",
  "regex",
  "serde_json",
  "tempfile",
  "tokio",
+ "triomphe",
  "url",
 ]
 
@@ -6471,18 +6471,6 @@ dependencies = [
  "rayon",
  "regex",
  "thiserror",
-]
-
-[[package]]
-name = "move-vm-debugger"
-version = "0.1.0"
-dependencies = [
- "crossbeam-channel",
- "move-binary-format",
- "move-core-types",
- "move-vm-runtime",
- "move-vm-types",
- "triomphe",
 ]
 
 [[package]]

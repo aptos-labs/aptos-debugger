@@ -1,5 +1,5 @@
-use crate::debug_value::DebugValue;
-use crate::{
+use crate::debugger::debug_value::DebugValue;
+use crate::debugger::{
     dap_types::{
         DapCommand, DapDebugHandle, DapEvent, DapFrameInfo, DapLocalInfo, StopReason,
         VmStoppedState,
@@ -155,7 +155,7 @@ impl DebugContext for DapDebugContext {
                 if let Some(ty) = function.local_tys().get(idx) {
                     let resolver = LocatorTypeResolver::new(runtime_environment, interpreter);
                     let sv =
-                        crate::debug_value::serialize_value_for_debug(locals, idx, ty, &resolver);
+                        crate::debugger::debug_value::serialize_value_for_debug(locals, idx, ty, &resolver);
                     self.moved_locals
                         .entry(current_stack_depth)
                         .or_default()
@@ -311,7 +311,7 @@ fn build_dap_local_infos(
         .into_iter()
         .map(|local_info| {
             let ty = &function.local_tys()[local_info.index];
-            let debug_value = crate::debug_value::serialize_value_for_debug(
+            let debug_value = crate::debugger::debug_value::serialize_value_for_debug(
                 locals,
                 local_info.index,
                 ty,

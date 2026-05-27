@@ -16,7 +16,7 @@ use dap::{
         StoppedEventReason, Thread,
     },
 };
-use move_vm_debugger::{DapCommand, DapEvent, StopReason, VmStoppedState};
+use crate::debugger::{DapCommand, DapEvent, StopReason, VmStoppedState};
 use std::{
     collections::BTreeMap,
     fmt::Display,

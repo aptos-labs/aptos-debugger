@@ -1,4 +1,4 @@
-use crate::debug_value::{AdtInfo, FieldInfo, TypeResolver};
+use crate::debugger::debug_value::{AdtInfo, FieldInfo, TypeResolver};
 use move_core_types::{identifier::Identifier, language_storage::ModuleId};
 use move_vm_runtime::{
     LoadedFunction, RuntimeEnvironment, debug::InterpreterDebugInterface, source_locator,
