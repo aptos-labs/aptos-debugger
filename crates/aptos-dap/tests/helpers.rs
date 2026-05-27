@@ -47,6 +47,14 @@ pub struct TestPackage {
     pub breakpoints: BTreeMap<String, String>,
 }
 
+pub fn test_mode(pkg: &TestPackage) -> RunCommand {
+    RunCommand::Test {
+        filter: String::new(),
+        package_path: pkg.path.clone(),
+        skip_fetch_latest_git_deps: true,
+    }
+}
+
 impl TestPackage {
     pub fn bp(&self, name: &str) -> &str {
         self.breakpoints

@@ -2,7 +2,7 @@ mod helpers;
 
 use aptos_dap::server::RunCommand;
 use expect_test::expect;
-use helpers::{build_test_package, DapTestServer, RECV_TIMEOUT};
+use helpers::{build_test_package, test_mode, DapTestServer, RECV_TIMEOUT};
 use std::time::Duration;
 
 #[test]
@@ -22,12 +22,7 @@ module 0x42::test {
 }
 "#,
     );
-    let mode = RunCommand::Test {
-        filter: String::new(),
-        package_path: pkg.path.clone(),
-        skip_fetch_latest_git_deps: true,
-    };
-    let mut t = DapTestServer::start(mode);
+    let mut t = DapTestServer::start(test_mode(&pkg));
     t.initialize_and_launch_test(&pkg);
 
     t.assert_frame_scopes(0, expect![[r#"
@@ -88,12 +83,7 @@ module 0x42::test {
 }
 "#,
     );
-    let mode = RunCommand::Test {
-        filter: String::new(),
-        package_path: pkg.path.clone(),
-        skip_fetch_latest_git_deps: true,
-    };
-    let mut t = DapTestServer::start(mode);
+    let mut t = DapTestServer::start(test_mode(&pkg));
     t.initialize_and_launch_test(&pkg);
 
     t.assert_stack_frames(expect![[r#"
@@ -130,12 +120,7 @@ module 0x42::test {
 }
 "#,
     );
-    let mode = RunCommand::Test {
-        filter: String::new(),
-        package_path: pkg.path.clone(),
-        skip_fetch_latest_git_deps: true,
-    };
-    let mut t = DapTestServer::start(mode);
+    let mut t = DapTestServer::start(test_mode(&pkg));
     t.initialize_and_launch_test(&pkg);
 
     t.assert_stack_frames(expect![[r#"
@@ -188,12 +173,7 @@ module 0x42::test {
 }
 "#,
     );
-    let mode = RunCommand::Test {
-        filter: String::new(),
-        package_path: pkg.path.clone(),
-        skip_fetch_latest_git_deps: true,
-    };
-    let mut t = DapTestServer::start(mode);
+    let mut t = DapTestServer::start(test_mode(&pkg));
     t.initialize_and_launch_test(&pkg);
 
     t.assert_frame_variables(0, expect![[r#"
@@ -231,12 +211,7 @@ module 0x42::test {
 }
 "#,
     );
-    let mode = RunCommand::Test {
-        filter: String::new(),
-        package_path: pkg.path.clone(),
-        skip_fetch_latest_git_deps: true,
-    };
-    let mut t = DapTestServer::start(mode);
+    let mut t = DapTestServer::start(test_mode(&pkg));
     t.initialize_and_launch_test(&pkg);
 
     t.assert_frame_variables(0, expect![[r#"
@@ -298,12 +273,7 @@ module 0x42::test {
 }
 "#,
     );
-    let mode = RunCommand::Test {
-        filter: String::new(),
-        package_path: pkg.path.clone(),
-        skip_fetch_latest_git_deps: true,
-    };
-    let mut t = DapTestServer::start(mode);
+    let mut t = DapTestServer::start(test_mode(&pkg));
     t.initialize_and_launch_test(&pkg);
 
     t.assert_frame_variables(0, expect![[r#"
@@ -341,12 +311,7 @@ module 0x42::test {
 }
 "#,
     );
-    let mode = RunCommand::Test {
-        filter: String::new(),
-        package_path: pkg.path.clone(),
-        skip_fetch_latest_git_deps: true,
-    };
-    let mut t = DapTestServer::start(mode);
+    let mut t = DapTestServer::start(test_mode(&pkg));
     t.initialize_and_launch_test(&pkg);
 
     t.assert_frame_variables(0, expect![[r#"
@@ -378,12 +343,7 @@ module 0x42::test {
 }
 "#,
     );
-    let mode = RunCommand::Test {
-        filter: String::new(),
-        package_path: pkg.path.clone(),
-        skip_fetch_latest_git_deps: true,
-    };
-    let mut t = DapTestServer::start(mode);
+    let mut t = DapTestServer::start(test_mode(&pkg));
     t.initialize_and_launch_test(&pkg);
 
     t.assert_stack_frames(expect![[r#"
@@ -435,12 +395,7 @@ module 0x42::test {
 }
 "#,
     );
-    let mode = RunCommand::Test {
-        filter: String::new(),
-        package_path: pkg.path.clone(),
-        skip_fetch_latest_git_deps: true,
-    };
-    let mut t = DapTestServer::start(mode);
+    let mut t = DapTestServer::start(test_mode(&pkg));
     t.initialize_and_launch_test(&pkg);
 
     t.assert_stack_frames(expect![[r#"
@@ -491,12 +446,7 @@ module 0x42::test {
 }
 "#,
     );
-    let mode = RunCommand::Test {
-        filter: String::new(),
-        package_path: pkg.path.clone(),
-        skip_fetch_latest_git_deps: true,
-    };
-    let mut t = DapTestServer::start(mode);
+    let mut t = DapTestServer::start(test_mode(&pkg));
     t.initialize_and_launch_test(&pkg);
 
     t.assert_stack_frames(expect![[r#"
@@ -565,12 +515,7 @@ module 0x42::test {
 }
 "#,
     );
-    let mode = RunCommand::Test {
-        filter: String::new(),
-        package_path: pkg.path.clone(),
-        skip_fetch_latest_git_deps: true,
-    };
-    let mut t = DapTestServer::start(mode);
+    let mut t = DapTestServer::start(test_mode(&pkg));
     t.initialize_and_launch_test(&pkg);
 
     t.assert_stack_frames(expect![[r#"
@@ -668,12 +613,7 @@ module 0x42::test {
 }
 "#,
     );
-    let mode = RunCommand::Test {
-        filter: String::new(),
-        package_path: pkg.path.clone(),
-        skip_fetch_latest_git_deps: true,
-    };
-    let mut t = DapTestServer::start(mode);
+    let mut t = DapTestServer::start(test_mode(&pkg));
     t.initialize_and_launch_test(&pkg);
 
     t.assert_frame_variables(0, expect![[r#"
@@ -783,12 +723,7 @@ module 0x42::test {
 }
 "#,
     );
-    let mode = RunCommand::Test {
-        filter: String::new(),
-        package_path: pkg.path.clone(),
-        skip_fetch_latest_git_deps: true,
-    };
-    let mut t = DapTestServer::start(mode);
+    let mut t = DapTestServer::start(test_mode(&pkg));
     t.initialize_and_launch_test(&pkg);
 
     t.assert_frame_variables(0, expect![[r#"
@@ -821,12 +756,7 @@ module 0x42::test {
 }
 "#,
     );
-    let mode = RunCommand::Test {
-        filter: String::new(),
-        package_path: pkg.path.clone(),
-        skip_fetch_latest_git_deps: true,
-    };
-    let mut t = DapTestServer::start(mode);
+    let mut t = DapTestServer::start(test_mode(&pkg));
     t.initialize_and_launch_test(&pkg);
 
     t.assert_frame_variables(0, expect![[r#"
@@ -867,12 +797,7 @@ module 0x42::test {
 }
 "#,
     );
-    let mode = RunCommand::Test {
-        filter: String::new(),
-        package_path: pkg.path.clone(),
-        skip_fetch_latest_git_deps: true,
-    };
-    let mut t = DapTestServer::start(mode);
+    let mut t = DapTestServer::start(test_mode(&pkg));
     t.initialize_and_launch_test(&pkg);
 
     t.assert_frame_variables(0, expect![[r#"
@@ -917,12 +842,7 @@ module 0x42::test {
 }
 "#,
     );
-    let mode = RunCommand::Test {
-        filter: String::new(),
-        package_path: pkg.path.clone(),
-        skip_fetch_latest_git_deps: true,
-    };
-    let mut t = DapTestServer::start(mode);
+    let mut t = DapTestServer::start(test_mode(&pkg));
     t.initialize_and_launch_test(&pkg);
 
     t.assert_frame_variables(0, expect![[r#"
@@ -957,12 +877,7 @@ module 0x42::test {
 }
 "#,
     );
-    let mode = RunCommand::Test {
-        filter: String::new(),
-        package_path: pkg.path.clone(),
-        skip_fetch_latest_git_deps: true,
-    };
-    let mut t = DapTestServer::start(mode);
+    let mut t = DapTestServer::start(test_mode(&pkg));
 
     t.initialize();
     t.launch();
