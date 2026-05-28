@@ -24,7 +24,9 @@ enum DebuggerOp {
         line_stack_depth: usize,
         line_sloc: Option<String>,
     },
-    Step,
+    StepInto {
+        line_sloc: Option<String>,
+    },
     StepOut {
         target_stack_depth: usize,
     },
@@ -151,7 +153,7 @@ impl DapDebugContext {
         Self {
             event_tx: handle.event_tx,
             command_rx: handle.command_rx,
-            next_cmd_op: DebuggerOp::Step,
+            next_cmd_op: DebuggerOp::StepInto { line_sloc: None },
             breakpoints: BTreeSet::new(),
             moved_locals: HashMap::new(),
             last_breakpoint_hit: None,
@@ -257,7 +259,13 @@ impl DapDebugContext {
                     false
                 }
             }
-            DebuggerOp::Step => true,
+            DebuggerOp::StepInto { line_sloc } => {
+                match (&current_source_line, &*line_sloc) {
+                    (Some(cur), Some(start)) => cur != start,
+                    (Some(_), None) => true,
+                    _ => false,
+                }
+            }
             // stop if we out of the target stack depth
             DebuggerOp::StepOut { target_stack_depth } => {
                 current_stack_depth <= *target_stack_depth
@@ -279,7 +287,9 @@ fn parse_cmd_op(
 ) -> DebuggerOp {
     match cmd {
         DapCommand::Continue => DebuggerOp::RunUntilBreakpoint,
-        DapCommand::Step => DebuggerOp::Step,
+        DapCommand::StepInto => DebuggerOp::StepInto {
+            line_sloc: current_line.clone(),
+        },
         DapCommand::StepOver => DebuggerOp::StepOver {
             line_stack_depth,
             line_sloc: current_line.clone(),

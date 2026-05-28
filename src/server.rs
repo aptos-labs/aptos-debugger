@@ -398,7 +398,7 @@ impl<R: io::Read, W: io::Write> DapServer<R, W> {
         _args: dap::requests::StepInArguments,
     ) -> Result<()> {
         self.server.respond(req.success(ResponseBody::StepIn))?;
-        self.send_command_and_wait(DapCommand::Step)?;
+        self.send_command_and_wait(DapCommand::StepInto)?;
         Ok(())
     }
 

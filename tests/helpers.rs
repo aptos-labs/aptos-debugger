@@ -382,6 +382,11 @@ impl DapTestServer {
         self.collect_until_event("stopped", 30);
     }
 
+    pub fn step_into(&mut self) {
+        self.send("stepIn", Some(serde_json::json!({ "threadId": 1 })));
+        self.collect_until_event("stopped", 30);
+    }
+
     pub fn continue_execution_timeout(&mut self, timeout: Duration) -> bool {
         self.send("continue", Some(serde_json::json!({ "threadId": 1 })));
         for _ in 0..30 {

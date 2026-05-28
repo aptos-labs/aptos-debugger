@@ -1084,3 +1084,77 @@ fn test_replay_basic() {
     }
     assert!(stop_count >= 1, "should have stopped at least once");
 }
+
+#[test]
+fn test_step_into_advances_to_next_line() {
+    // language=Move
+    let pkg = build_test_package(
+        r#"
+module 0x42::test {
+    fun helper(a: u64, b: u64): u64 {
+        let sum = a + b; // bp1
+        let doubled = sum * 2;
+        doubled
+    }
+
+    #[test]
+    fun test_it() {
+        let _ = helper(10, 20);
+    }
+}
+"#,
+    );
+    let mut t = DapTestServer::start(test_mode(&pkg));
+    t.initialize_and_launch_test(&pkg);
+
+    // Stopped at bp1 (line 4: let sum = a + b;)
+    t.assert_stack_frames(expect![[r#"
+        [
+          {
+            "id": 0,
+            "name": "0x42::test::helper",
+            "source": {
+              "name": "test.move",
+              "path": "$TMPDIR/sources/test.move"
+            },
+            "line": 4,
+            "column": 0
+          },
+          {
+            "id": 1,
+            "name": "0x42::test::test_it",
+            "source": {
+              "name": "test.move",
+              "path": "$TMPDIR/sources/test.move"
+            },
+            "line": 11,
+            "column": 0
+          }
+        ]"#]]);
+
+    // stepIn should advance to the next SOURCE LINE (line 5), not just the next bytecode
+    t.step_into();
+    t.assert_stack_frames(expect![[r#"
+        [
+          {
+            "id": 0,
+            "name": "0x42::test::helper",
+            "source": {
+              "name": "test.move",
+              "path": "$TMPDIR/sources/test.move"
+            },
+            "line": 5,
+            "column": 0
+          },
+          {
+            "id": 1,
+            "name": "0x42::test::test_it",
+            "source": {
+              "name": "test.move",
+              "path": "$TMPDIR/sources/test.move"
+            },
+            "line": 11,
+            "column": 0
+          }
+        ]"#]]);
+}
