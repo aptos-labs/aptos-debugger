@@ -8,9 +8,9 @@ use crate::debugger::{
     resolver::{self, LocatorTypeResolver},
 };
 use move_vm_runtime::{
+    debug::{DebugContext, InterpreterDebugInterface, ThreadStateHandle}, source_locator,
+    tracing,
     LoadedFunction, RuntimeEnvironment,
-    debug::{DebugContext, InterpreterDebugInterface, ThreadStateHandle},
-    source_locator, tracing,
 };
 use move_vm_types::{instr::Instruction, values::Locals};
 use std::{
@@ -20,7 +20,7 @@ use std::{
 
 #[derive(Debug)]
 enum DebuggerOp {
-    StepOverLine {
+    StepOver {
         line_stack_depth: usize,
         line_sloc: Option<String>,
     },
@@ -84,7 +84,8 @@ impl DebugContext for DapDebugContext {
         let breakpoint_hit =
             self.check_if_breakpoint_got_hit(current_stack_depth, current_line.clone());
 
-        let should_stop_at_current_line = self.apply_next_cmd_op(interpreter, current_line.clone());
+        let should_stop_at_current_line =
+            self.should_stop_for_the_next_cmd_op(interpreter, current_line.clone());
 
         if !should_stop_at_current_line && breakpoint_hit.is_none() {
             return;
@@ -93,7 +94,6 @@ impl DebugContext for DapDebugContext {
         let vm_stopped_state = build_vm_stopped_state(
             function,
             locals,
-            instr,
             runtime_environment,
             interpreter,
             current_line.clone(),
@@ -235,15 +235,14 @@ impl DapDebugContext {
         breakpoint_hit
     }
 
-    fn apply_next_cmd_op(
+    fn should_stop_for_the_next_cmd_op(
         &mut self,
         interpreter: &dyn InterpreterDebugInterface,
         current_source_line: Option<String>,
     ) -> bool {
         let current_stack_depth = interpreter.get_stack_depth();
         let should_stop_after_op = match &self.next_cmd_op {
-            DebuggerOp::Step => true,
-            DebuggerOp::StepOverLine {
+            DebuggerOp::StepOver {
                 line_stack_depth,
                 line_sloc,
             } => {
@@ -258,15 +257,14 @@ impl DapDebugContext {
                     false
                 }
             }
+            DebuggerOp::Step => true,
+            // stop if we out of the target stack depth
             DebuggerOp::StepOut { target_stack_depth } => {
-                if *target_stack_depth == interpreter.get_stack_depth() {
-                    true
-                } else {
-                    false
-                }
+                current_stack_depth <= *target_stack_depth
             }
             DebuggerOp::RunUntilBreakpoint => false,
         };
+        // next command after stop is already `DebuggerOp::RunUntilBreakpoint`
         if should_stop_after_op {
             self.next_cmd_op = DebuggerOp::RunUntilBreakpoint;
         }
@@ -282,7 +280,7 @@ fn parse_cmd_op(
     match cmd {
         DapCommand::Continue => DebuggerOp::RunUntilBreakpoint,
         DapCommand::Step => DebuggerOp::Step,
-        DapCommand::StepOver => DebuggerOp::StepOverLine {
+        DapCommand::StepOver => DebuggerOp::StepOver {
             line_stack_depth,
             line_sloc: current_line.clone(),
         },
@@ -339,7 +337,6 @@ fn build_dap_local_infos(
 fn build_vm_stopped_state(
     function: &LoadedFunction,
     locals: &Locals,
-    instr: &Instruction,
     runtime_environment: &RuntimeEnvironment,
     interpreter: &dyn InterpreterDebugInterface,
     current_line: Option<String>,
@@ -395,7 +392,6 @@ fn build_vm_stopped_state(
 
     VmStoppedState {
         function_name: function.name_as_pretty_string(),
-        instruction: format!("{:?}", instr),
         dap_stack_trace,
         dap_locals: local_infos,
         source_location: current_line,

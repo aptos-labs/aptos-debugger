@@ -34,7 +34,6 @@ pub struct DapLocalInfo {
 #[derive(Debug)]
 pub struct VmStoppedState {
     pub function_name: String,
-    pub instruction: String,
     pub dap_stack_trace: Vec<DapFrameInfo>,
     pub dap_locals: Vec<DapLocalInfo>,
     pub source_location: Option<String>,
@@ -110,7 +109,6 @@ mod tests {
                 reason: StopReason::Step,
                 vm_state: VmStoppedState {
                     function_name: "test_module::test_fn::0".to_string(),
-                    instruction: "Call(0)".to_string(),
                     dap_stack_trace: vec![DapFrameInfo {
                         function_name: "test_module::test_fn".to_string(),
                         source_location: Some("test.move:10".to_string()),
@@ -135,7 +133,6 @@ mod tests {
                 reason: StopReason::Breakpoint("test_module::test_fn".to_string()),
                 vm_state: VmStoppedState {
                     function_name: "test_module::test_fn::1".to_string(),
-                    instruction: "Ret".to_string(),
                     dap_stack_trace: vec![],
                     dap_locals: vec![],
                     source_location: None,
