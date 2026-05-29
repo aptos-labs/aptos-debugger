@@ -5,7 +5,7 @@ use crate::{
         replay::{ReplayTransactionSession, SCOPE_TRANSACTION_INFO},
         variables::{StoredVariables, frame_locals_ref_id},
     },
-    utils::{parse_source_location, trim_hex_address},
+    utils::{SourceLoc, trim_hex_address},
 };
 use anyhow::Result;
 use dap::{
@@ -55,7 +55,7 @@ pub struct DapServer<R: io::Read, W: io::Write> {
     event_rx: Option<crossbeam_channel::Receiver<DapEvent>>,
     vm_thread: Option<thread::JoinHandle<Result<()>>>,
     vm_stopped_state: Option<VmStoppedState>,
-    pending_breakpoints: Vec<String>,
+    pending_breakpoints: Vec<SourceLoc>,
     stored_variables: StoredVariables,
 }
 
@@ -180,24 +180,26 @@ impl<R: io::Read, W: io::Write> DapServer<R, W> {
         args: dap::requests::SetBreakpointsArguments,
     ) -> Result<()> {
         let raw_path = args.source.path.as_deref().unwrap_or("");
-        let source_path = std::path::Path::new(raw_path)
-            .canonicalize()
-            .map(|p| p.to_string_lossy().into_owned())
-            .unwrap_or_else(|_| raw_path.to_string());
-        let bp_strings: Vec<String> = args
+        let source_path = std::path::Path::new(raw_path);
+        let new_breakpoints: Vec<SourceLoc> = args
             .breakpoints
             .as_ref()
             .map(|bps| {
                 bps.iter()
-                    .map(|bp| format!("{}:{}", source_path, bp.line))
+                    .map(|bp| SourceLoc::new(source_path, bp.line as u32))
                     .collect()
             })
             .unwrap_or_default();
 
-        self.send_console(format_args!("aptos-dap: setBreakpoints: {:?}", bp_strings))?;
+        self.send_console(format_args!("aptos-dap: setBreakpoints: {:?}", new_breakpoints))?;
+        let canonical_path = new_breakpoints
+            .first()
+            .map(|bp| &bp.path)
+            .cloned()
+            .unwrap_or_else(|| source_path.to_path_buf());
         self.pending_breakpoints
-            .retain(|bp| !bp.starts_with(&source_path));
-        self.pending_breakpoints.extend(bp_strings);
+            .retain(|bp| bp.path != canonical_path);
+        self.pending_breakpoints.extend(new_breakpoints);
 
         if let Some(tx) = &self.cmd_tx {
             let _ = tx.send(DapCommand::SetBreakpoints(self.pending_breakpoints.clone()));
@@ -334,12 +336,12 @@ impl<R: io::Read, W: io::Write> DapServer<R, W> {
 
     fn warn_on_unreachable_breakpoints(&mut self, known_files: &[String]) -> Result<()> {
         let is_replay = matches!(self.mode, RunCommand::Replay { .. });
-        let unreachable: Vec<String> = self
+        let unreachable: Vec<SourceLoc> = self
             .pending_breakpoints
             .iter()
             .filter(|bp| {
-                let file = bp.rsplit_once(':').map(|(f, _)| f).unwrap_or(bp);
-                !known_files.iter().any(|f| f == file)
+                let file = bp.path.to_string_lossy();
+                !known_files.iter().any(|f| f == file.as_ref())
             })
             .cloned()
             .collect();
@@ -418,11 +420,10 @@ impl<R: io::Read, W: io::Write> DapServer<R, W> {
         _args: dap::requests::StackTraceArguments,
     ) -> Result<()> {
         let stack_frames = if let Some(vm_state) = &self.vm_stopped_state {
-            let (source, line) = vm_state
-                .source_location
-                .as_deref()
-                .map(parse_source_location)
-                .unwrap_or((None, 0));
+            let (source, line) = match &vm_state.source_location {
+                Some(loc) => (Some(loc.to_dap_source()), loc.line as i64),
+                None => (None, 0),
+            };
             let mut frames = vec![StackFrame {
                 id: 0,
                 name: trim_hex_address(&vm_state.function_name),
@@ -432,11 +433,10 @@ impl<R: io::Read, W: io::Write> DapServer<R, W> {
                 ..Default::default()
             }];
             for (i, frame) in vm_state.dap_stack_trace.iter().enumerate() {
-                let (source, line) = frame
-                    .source_location
-                    .as_deref()
-                    .map(parse_source_location)
-                    .unwrap_or((None, 0));
+                let (source, line) = match &frame.source_location {
+                    Some(loc) => (Some(loc.to_dap_source()), loc.line as i64),
+                    None => (None, 0),
+                };
                 frames.push(StackFrame {
                     id: (i + 1) as i64,
                     name: trim_hex_address(&frame.function_name),
@@ -560,11 +560,12 @@ impl<R: io::Read, W: io::Write> DapServer<R, W> {
         if let Some(state) = &self.vm_stopped_state {
             let location = state
                 .source_location
-                .as_deref()
-                .unwrap_or("unknown location");
+                .as_ref()
+                .map(|loc| loc.to_string())
+                .unwrap_or_else(|| "unknown location".to_string());
             let msg = match reason {
-                StopReason::Breakpoint(name) => {
-                    format!("Breakpoint hit: {name}")
+                StopReason::Breakpoint(bp) => {
+                    format!("Breakpoint hit: {bp}")
                 }
                 StopReason::Entry => {
                     format!("Stopped at entry: {} at {location}", state.function_name)

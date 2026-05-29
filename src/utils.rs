@@ -1,3 +1,36 @@
+use std::path::{Path, PathBuf};
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct SourceLoc {
+    pub path: PathBuf,
+    pub line: u32,
+}
+
+impl SourceLoc {
+    pub fn new(path: &Path, line: u32) -> Self {
+        let path = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
+        Self { path, line }
+    }
+
+    pub fn to_dap_source(&self) -> dap::types::Source {
+        let name = self
+            .path
+            .file_name()
+            .map(|f| f.to_string_lossy().into_owned());
+        dap::types::Source {
+            name,
+            path: Some(self.path.to_string_lossy().into_owned()),
+            ..Default::default()
+        }
+    }
+}
+
+impl std::fmt::Display for SourceLoc {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}:{}", self.path.display(), self.line)
+    }
+}
+
 pub(crate) fn trim_hex_address(name: &str) -> String {
     let Some((first, rest)) = name.split_once("::") else {
         return name.to_string();
@@ -13,24 +46,6 @@ pub(crate) fn trim_hex_address(name: &str) -> String {
     format!("{}{}::{}", prefix, trimmed, rest)
 }
 
-pub(crate) fn parse_source_location(location: &str) -> (Option<dap::types::Source>, i64) {
-    let parts: Vec<&str> = location.rsplitn(2, ':').collect();
-    if parts.len() == 2 {
-        let line = parts[0].parse().unwrap_or(0);
-        let path = parts[1];
-        let name = std::path::Path::new(path)
-            .file_name()
-            .map(|f| f.to_string_lossy().into_owned());
-        let source = dap::types::Source {
-            name,
-            path: Some(path.to_string()),
-            ..Default::default()
-        };
-        (Some(source), line)
-    } else {
-        (None, 0)
-    }
-}
 
 #[cfg(test)]
 mod tests {
@@ -72,39 +87,4 @@ mod tests {
         assert_eq!(trim_hex_address("no_hex_here::func"), "no_hex_here::func");
     }
 
-    #[test]
-    fn test_parse_source_location() {
-        let (src, line) = parse_source_location("/home/user/project/sources/test.move:42");
-        let src = src.unwrap();
-        assert_eq!(src.name.as_deref(), Some("test.move"));
-        assert_eq!(
-            src.path.as_deref(),
-            Some("/home/user/project/sources/test.move")
-        );
-        assert_eq!(line, 42);
-
-        let (src, line) = parse_source_location("test.move:1");
-        let src = src.unwrap();
-        assert_eq!(src.name.as_deref(), Some("test.move"));
-        assert_eq!(src.path.as_deref(), Some("test.move"));
-        assert_eq!(line, 1);
-
-        let (src, line) = parse_source_location("no_colon_here");
-        assert!(src.is_none());
-        assert_eq!(line, 0);
-
-        let (src, line) = parse_source_location("test.move:not_a_number");
-        let src = src.unwrap();
-        assert_eq!(src.path.as_deref(), Some("test.move"));
-        assert_eq!(line, 0);
-
-        let (src, line) = parse_source_location("");
-        assert!(src.is_none());
-        assert_eq!(line, 0);
-
-        let (src, line) = parse_source_location("C:\\Users\\file.move:10");
-        let src = src.unwrap();
-        assert_eq!(src.path.as_deref(), Some("C:\\Users\\file.move"));
-        assert_eq!(line, 10);
-    }
 }

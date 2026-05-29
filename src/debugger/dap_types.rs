@@ -1,4 +1,5 @@
 use crate::debugger::debug_value::DebugValue;
+use crate::utils::SourceLoc;
 
 #[derive(Debug)]
 pub enum DapCommand {
@@ -6,20 +7,20 @@ pub enum DapCommand {
     StepInto,
     StepOver,
     StepOut,
-    SetBreakpoints(Vec<String>),
+    SetBreakpoints(Vec<SourceLoc>),
 }
 
 #[derive(Debug)]
 pub enum StopReason {
     Entry,
     Step,
-    Breakpoint(String),
+    Breakpoint(SourceLoc),
 }
 
 #[derive(Debug)]
 pub struct DapFrameInfo {
     pub function_name: String,
-    pub source_location: Option<String>,
+    pub source_location: Option<SourceLoc>,
     pub locals: Vec<DapLocalInfo>,
 }
 
@@ -36,7 +37,7 @@ pub struct VmStoppedState {
     pub function_name: String,
     pub dap_stack_trace: Vec<DapFrameInfo>,
     pub dap_locals: Vec<DapLocalInfo>,
-    pub source_location: Option<String>,
+    pub source_location: Option<SourceLoc>,
 }
 
 #[derive(Debug)]
@@ -75,6 +76,7 @@ pub fn create_dap_channels() -> (
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::Path;
     use std::thread;
 
     #[test]
@@ -111,7 +113,7 @@ mod tests {
                     function_name: "test_module::test_fn::0".to_string(),
                     dap_stack_trace: vec![DapFrameInfo {
                         function_name: "test_module::test_fn".to_string(),
-                        source_location: Some("test.move:10".to_string()),
+                        source_location: Some(SourceLoc::new(Path::new("test.move"), 10)),
                         locals: vec![],
                     }],
                     dap_locals: vec![DapLocalInfo {
@@ -120,7 +122,7 @@ mod tests {
                         type_name: "u64".to_string(),
                         value: DebugValue::Primitive("42".to_string()),
                     }],
-                    source_location: Some("test.move:10".to_string()),
+                    source_location: Some(SourceLoc::new(Path::new("test.move"), 10)),
                 },
             })
             .unwrap();
@@ -130,7 +132,7 @@ mod tests {
 
         evt_tx
             .send(DapEvent::Stopped {
-                reason: StopReason::Breakpoint("test_module::test_fn".to_string()),
+                reason: StopReason::Breakpoint(SourceLoc::new(Path::new("test.move"), 10)),
                 vm_state: VmStoppedState {
                     function_name: "test_module::test_fn::1".to_string(),
                     dap_stack_trace: vec![],
