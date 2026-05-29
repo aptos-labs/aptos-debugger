@@ -191,7 +191,8 @@ impl<R: io::Read, W: io::Write> DapServer<R, W> {
             })
             .unwrap_or_default();
 
-        self.send_console(format_args!("aptos-dap: setBreakpoints: {:?}", new_breakpoints))?;
+        let bps_str: Vec<String> = new_breakpoints.iter().map(|bp| bp.to_string()).collect();
+        self.send_console(format_args!("aptos-dap: setBreakpoints: [{}]", bps_str.join(", ")))?;
         let canonical_path = new_breakpoints
             .first()
             .map(|bp| &bp.path)
@@ -263,9 +264,10 @@ impl<R: io::Read, W: io::Write> DapServer<R, W> {
         }
 
         if !self.pending_breakpoints.is_empty() {
+            let bps: Vec<String> = self.pending_breakpoints.iter().map(|bp| bp.to_string()).collect();
             let msg = format!(
-                "aptos-dap: setting breakpoints: {:?}",
-                self.pending_breakpoints
+                "aptos-dap: setting breakpoints: [{}]",
+                bps.join(", ")
             );
             self.send_console(msg)?;
             if let Some(tx) = &self.cmd_tx {
