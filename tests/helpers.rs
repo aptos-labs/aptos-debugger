@@ -12,8 +12,12 @@ use std::{
 fn sanitize_frame(frame: &serde_json::Value) -> serde_json::Value {
     let mut f = frame.clone();
     if let Some(path) = f["source"]["path"].as_str() {
-        let re = regex::Regex::new(r"/tmp/dap_tests/[^/]+/").unwrap();
-        f["source"]["path"] = serde_json::Value::String(re.replace(path, "$$TMPDIR/").to_string());
+        let base = std::env::temp_dir().join("dap_tests");
+        let base_str = format!("{}/", base.display());
+        if let Some(rest) = path.strip_prefix(&base_str) {
+            let after_subdir = rest.find('/').map(|i| &rest[i + 1..]).unwrap_or(rest);
+            f["source"]["path"] = serde_json::Value::String(format!("$TMPDIR/{after_subdir}"));
+        }
     }
     f
 }
@@ -62,7 +66,7 @@ impl TestPackage {
 
 pub fn build_test_package(source: &str) -> TestPackage {
     let test_name = thread::current().name().unwrap_or("unknown").to_string();
-    let base = PathBuf::from("/tmp/dap_tests");
+    let base = std::env::temp_dir().join("dap_tests");
     std::fs::create_dir_all(&base).unwrap();
     let tmp = tempfile::Builder::new()
         .prefix(&format!("{test_name}_"))

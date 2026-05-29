@@ -43,4 +43,6 @@ jobs:
         with:
           tool: nextest@0.9.133
 
+      - run: cargo build --tests
+
       - run: cargo nextest run --hide-progress-bar --no-fail-fast --failure-output=immediate-final
