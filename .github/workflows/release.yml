@@ -55,7 +55,7 @@ jobs:
       - name: Package binary
         run: |
           mkdir -p dist
-          cp target/${{ matrix.target }}/dist/aptos-dap dist/aptos-dap-${{ matrix.code-target }}
+          gzip -c target/${{ matrix.target }}/dist/aptos-dap > dist/aptos-dap-${{ matrix.code-target }}.gz
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v7

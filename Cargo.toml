@@ -10,6 +10,7 @@ edition = "2024"
 inherits = "release"
 opt-level = "z"
 lto = "thin"
+strip = true
 
 [dependencies]
 anyhow = "1.0.98"
