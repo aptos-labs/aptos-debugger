@@ -46,7 +46,6 @@ pub(crate) fn trim_hex_address(name: &str) -> String {
     format!("{}{}::{}", prefix, trimmed, rest)
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -86,5 +85,4 @@ mod tests {
 
         assert_eq!(trim_hex_address("no_hex_here::func"), "no_hex_here::func");
     }
-
 }
