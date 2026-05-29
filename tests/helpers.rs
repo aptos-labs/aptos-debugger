@@ -113,6 +113,12 @@ version = "0.0.1"
 }
 
 impl DapTestServer {
+    pub fn run_test(pkg: &TestPackage) -> Self {
+        let mut server = Self::start(test_mode(pkg));
+        server.initialize_and_launch_test(&pkg);
+        server
+    }
+
     pub fn start(mode: RunCommand) -> Self {
         let (server_reader, client_writer) = std::io::pipe().unwrap();
         let (client_reader, server_writer) = std::io::pipe().unwrap();
@@ -224,6 +230,12 @@ impl DapTestServer {
             let m = self.recv_with_timeout(timeout);
             if m["type"] == "event" && m["event"] == event {
                 return m;
+            }
+            if m["type"] == "event" && m["event"] == "terminated" {
+                panic!(
+                    "execution terminated while waiting for '{event}' event \
+                     (test ran to completion without hitting a breakpoint)"
+                );
             }
         }
         panic!("no '{event}' event within {max} messages");
