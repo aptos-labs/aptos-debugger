@@ -10,8 +10,7 @@ env:
   CARGO_INCREMENTAL: 0
   CARGO_NET_RETRY: 10
   RUSTUP_MAX_RETRIES: 10
-  FETCH_DEPTH: 0 # pull in the tags for the version string
-  MACOSX_DEPLOYMENT_TARGET: 13.0
+  FETCH_DEPTH: 0
 
 jobs:
   dist:
@@ -19,22 +18,20 @@ jobs:
     strategy:
       matrix:
         include:
-          - os: ubuntu-latest
+          - os: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
-            container: quay.io/pypa/manylinux_2_28_x86_64
             code-target: linux-x64
 
-          - os: macos-14
+          - os: macos-15-intel
             target: x86_64-apple-darwin
             code-target: darwin-x64
 
-          - os: macos-14
+          - os: macos-latest
             target: aarch64-apple-darwin
             code-target: darwin-arm64
 
     name: dist (${{ matrix.target }})
     runs-on: ${{ matrix.os }}
-    container: ${{ matrix.container }}
 
     steps:
       - name: Checkout repository
@@ -42,16 +39,15 @@ jobs:
         with:
           fetch-depth: ${{ env.FETCH_DEPTH }}
 
-      - name: Install rustup
-        if: ${{ matrix.container }}
-        run: |
-          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal
-          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+      - name: Install system dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y build-essential pkgconf libssl-dev libudev-dev lld clang llvm cmake
 
       - name: Install Rust toolchain
-        run: |
-          rustup update --no-self-update stable
-          rustup target add ${{ matrix.target }}
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
 
       - name: Build
         run: cargo build --profile dist --target ${{ matrix.target }}
