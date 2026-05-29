@@ -9,11 +9,21 @@ use std::{
     time::Duration,
 };
 
+fn tmpdir() -> PathBuf {
+    let tmpdir_base = std::env::temp_dir().join("dap_tests");
+    let tmpdir_base = tmpdir_base.canonicalize().unwrap_or(tmpdir_base);
+    tmpdir_base
+}
+
 fn sanitize_frame(frame: &serde_json::Value) -> serde_json::Value {
     let mut f = frame.clone();
     if let Some(path) = f["source"]["path"].as_str() {
-        let re = regex::Regex::new(r"/tmp/dap_tests/[^/]+/").unwrap();
-        f["source"]["path"] = serde_json::Value::String(re.replace(path, "$$TMPDIR/").to_string());
+        let tmpdir_base = tmpdir();
+        let base_str = format!("{}/", tmpdir_base.display());
+        if let Some(rest) = path.strip_prefix(&base_str) {
+            let after_subdir = rest.find('/').map(|i| &rest[i + 1..]).unwrap_or(rest);
+            f["source"]["path"] = serde_json::Value::String(format!("$TMPDIR/{after_subdir}"));
+        }
     }
     f
 }
@@ -62,18 +72,23 @@ impl TestPackage {
 
 pub fn build_test_package(source: &str) -> TestPackage {
     let test_name = thread::current().name().unwrap_or("unknown").to_string();
-    let base = PathBuf::from("/tmp/dap_tests");
-    std::fs::create_dir_all(&base).unwrap();
+    let tmpdir_base = tmpdir();
+    std::fs::create_dir_all(&tmpdir_base).unwrap();
     let tmp = tempfile::Builder::new()
         .prefix(&format!("{test_name}_"))
-        .tempdir_in(&base)
+        .tempdir_in(&tmpdir_base)
         .unwrap();
     let pkg = tmp.path().to_path_buf();
     let sources = pkg.join("sources");
     std::fs::create_dir_all(&sources).unwrap();
     std::fs::write(
         pkg.join("Move.toml"),
-        "[package]\nname = \"Test\"\nversion = \"0.0.1\"\n",
+        // language=TOML
+        r#"
+[package]
+name = "Test"
+version = "0.0.1"
+"#,
     )
     .unwrap();
     let source_path = sources.join("test.move");

@@ -1,0 +1,9 @@
+repos:
+  - repo: local
+    hooks:
+      - id: rustfmt
+        name: rustfmt
+        description: Runs rustfmt on the staged files before commit
+        entry: bash -c 'cargo fmt --all -- --color always && git add -u'
+        language: system
+        pass_filenames: false

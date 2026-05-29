@@ -9,9 +9,9 @@ use crate::debugger::{
 };
 use crate::utils::SourceLoc;
 use move_vm_runtime::{
-    debug::{DebugContext, InterpreterDebugInterface, ThreadStateHandle}, source_locator,
-    tracing,
     LoadedFunction, RuntimeEnvironment,
+    debug::{DebugContext, InterpreterDebugInterface, ThreadStateHandle},
+    source_locator, tracing,
 };
 use move_vm_types::{instr::Instruction, values::Locals};
 use std::{
@@ -78,14 +78,13 @@ impl DebugContext for DapDebugContext {
             interpreter,
         );
 
-        let current_line = function.module_id().and_then(|mid| {
-            vm_source_location(mid, function.index(), pc)
-        });
+        let current_line = function
+            .module_id()
+            .and_then(|mid| vm_source_location(mid, function.index(), pc));
         let current_stack_depth = interpreter.get_stack_depth();
 
         // should be checked before `self.next_cmd_op` to not stop at the line twice
-        let breakpoint_hit =
-            self.check_if_breakpoint_got_hit(current_stack_depth, &current_line);
+        let breakpoint_hit = self.check_if_breakpoint_got_hit(current_stack_depth, &current_line);
 
         let should_stop_at_current_line =
             self.should_stop_for_the_next_cmd_op(interpreter, &current_line);
@@ -208,9 +207,7 @@ impl DapDebugContext {
             // deeper in the stack — don't clear, don't suppress
             Some((_, last_bp_depth)) if current_stack_depth > *last_bp_depth => false,
             // on the same bp line, suppress it if we're on the same depth
-            Some((last_bp_loc, last_bp_depth))
-                if current_line.as_ref() == Some(last_bp_loc) =>
-            {
+            Some((last_bp_loc, last_bp_depth)) if current_line.as_ref() == Some(last_bp_loc) => {
                 current_stack_depth == *last_bp_depth
             }
             // moved to a different line at the acceptable stack depth, so bp shouldn't be suppressed.
@@ -259,13 +256,11 @@ impl DapDebugContext {
                     false
                 }
             }
-            DebuggerOp::StepInto { line_sloc } => {
-                match (current_source_line, line_sloc) {
-                    (Some(cur), Some(start)) => cur != start,
-                    (Some(_), None) => true,
-                    _ => false,
-                }
-            }
+            DebuggerOp::StepInto { line_sloc } => match (current_source_line, line_sloc) {
+                (Some(cur), Some(start)) => cur != start,
+                (Some(_), None) => true,
+                _ => false,
+            },
             // stop if we out of the target stack depth
             DebuggerOp::StepOut { target_stack_depth } => {
                 current_stack_depth <= *target_stack_depth
@@ -370,9 +365,9 @@ fn build_vm_stopped_state(
         .iter()
         .enumerate()
         .map(|(i, (module_id, func_def_idx, code_offset))| {
-            let frame_source_line = module_id.as_ref().and_then(|mid| {
-                vm_source_location(mid, *func_def_idx, *code_offset)
-            });
+            let frame_source_line = module_id
+                .as_ref()
+                .and_then(|mid| vm_source_location(mid, *func_def_idx, *code_offset));
             let caller_depth = stack_depth - 1 - i;
             let moved_locals_at_frame = moved_locals.get(&caller_depth);
             let (frame_fname, frame_locals_infos) = match interpreter.get_frame_locals(i) {
