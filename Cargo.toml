@@ -16,7 +16,7 @@ strip = true
 anyhow = "1.0.98"
 aptos-framework = { git = "https://github.com/aptos-labs/aptos-core.git", branch = "debug-value-extracted" }
 aptos-gas-schedule = { git = "https://github.com/aptos-labs/aptos-core.git", branch = "debug-value-extracted" }
-aptos-move-cli = { git = "https://github.com/aptos-labs/aptos-core.git", branch = "debug-value-extracted", features = ["testing"] }
+aptos-move-cli = { git = "https://github.com/aptos-labs/aptos-core.git", branch = "debug-value-extracted", features = ["testing", "debugger"] }
 aptos-move-debugger = { git = "https://github.com/aptos-labs/aptos-core.git", branch = "debug-value-extracted" }
 aptos-resource-viewer = { git = "https://github.com/aptos-labs/aptos-core.git", branch = "debug-value-extracted" }
 aptos-rest-client = { git = "https://github.com/aptos-labs/aptos-core.git", branch = "debug-value-extracted" }
